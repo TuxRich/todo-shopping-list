@@ -1,6 +1,6 @@
 name: "ToDo & Shopping List"
 description: "A todo and shopping list manager with categories, tags, deadlines, and shopping history"
-version: "1.0.0"
+version: "1.0.1"
 slug: "todo-shopping-list"
 url: "https://github.com/TuxRich/todo-shopping-list"
 arch:
