@@ -1,0 +1,6 @@
+data/
+todo-app
+todo-app.exe
+*.db
+*.db-shm
+*.db-wal
