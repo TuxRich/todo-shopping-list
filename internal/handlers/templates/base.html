@@ -1,0 +1,58 @@
+{{define "base"}}
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{if .Title}}{{.Title}} - {{end}}ToDo & Shopping</title>
+    {{if .BasePath}}<base href="{{.BasePath}}">{{end}}
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {"50":"#eef2ff","100":"#e0e7ff","200":"#c7d2fe","300":"#a5b4fc","400":"#818cf8","500":"#6366f1","600":"#4f46e5","700":"#4338ca","800":"#3730a3","900":"#312e81"}
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="h-full bg-gray-50" hx-boost="true">
+    <div class="min-h-full">
+        <nav class="bg-primary-700 shadow-lg">
+            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div class="flex h-14 items-center justify-between">
+                    <div class="flex items-center space-x-8">
+                        <a href="/" class="text-white font-bold text-lg tracking-tight">ToDo & Shopping</a>
+                        <div class="hidden md:flex space-x-1">
+                            <a href="/todos" class="text-primary-100 hover:bg-primary-600 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors {{if eq .ActiveNav "todos"}}bg-primary-800 text-white{{end}}">Todo Lists</a>
+                            <a href="/shopping" class="text-primary-100 hover:bg-primary-600 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors {{if eq .ActiveNav "shopping"}}bg-primary-800 text-white{{end}}">Shopping Lists</a>
+                            <a href="/settings" class="text-primary-100 hover:bg-primary-600 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors {{if eq .ActiveNav "settings"}}bg-primary-800 text-white{{end}}">Settings</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="md:hidden border-t border-primary-600">
+                <div class="flex justify-around py-1">
+                    <a href="/todos" class="text-primary-100 hover:text-white px-3 py-2 text-xs font-medium {{if eq .ActiveNav "todos"}}text-white{{end}}">Todos</a>
+                    <a href="/shopping" class="text-primary-100 hover:text-white px-3 py-2 text-xs font-medium {{if eq .ActiveNav "shopping"}}text-white{{end}}">Shopping</a>
+                    <a href="/settings" class="text-primary-100 hover:text-white px-3 py-2 text-xs font-medium {{if eq .ActiveNav "settings"}}text-white{{end}}">Settings</a>
+                </div>
+            </div>
+        </nav>
+
+        <main class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-6">
+            {{template "content" .}}
+        </main>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
+{{end}}

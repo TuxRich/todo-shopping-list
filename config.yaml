@@ -1,0 +1,20 @@
+name: "ToDo & Shopping List"
+description: "A todo and shopping list manager with categories, tags, deadlines, and shopping history"
+version: "1.0.0"
+slug: "todo-shopping-list"
+url: "https://github.com/TuxRich/todo-shopping-list"
+arch:
+  - amd64
+  - aarch64
+  - armv7
+ingress: true
+ingress_port: 8099
+panel_title: "ToDo & Shopping"
+panel_icon: "mdi:clipboard-check-outline"
+startup: "application"
+boot: "auto"
+map:
+  - type: data
+    read_only: false
+options: {}
+schema: {}

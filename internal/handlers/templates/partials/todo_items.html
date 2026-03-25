@@ -1,0 +1,120 @@
+{{define "todo-items-list"}}
+{{if .Items}}
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 divide-y divide-gray-100" id="todo-sortable">
+    {{range .Items}}
+    <div class="flex items-start gap-3 p-4 group {{if .Completed}}opacity-60{{end}}" data-id="{{.ID}}">
+        <button hx-post="/todos/items/{{.ID}}/toggle" hx-target="#items-list" hx-swap="innerHTML"
+            class="mt-0.5 flex-shrink-0 w-5 h-5 rounded border-2 {{if .Completed}}bg-primary-500 border-primary-500{{else}}border-gray-300 hover:border-primary-500{{end}} flex items-center justify-center transition-colors">
+            {{if .Completed}}
+            <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+            {{end}}
+        </button>
+        <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-gray-900 {{if .Completed}}line-through text-gray-500{{end}}">{{.Title}}</p>
+            {{if .Description}}
+            <p class="text-xs text-gray-500 mt-0.5">{{.Description}}</p>
+            {{end}}
+            <div class="flex flex-wrap items-center gap-2 mt-1">
+                {{if .Deadline}}
+                <span class="inline-flex items-center text-xs text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    {{derefStr .Deadline}}
+                </span>
+                {{end}}
+                {{if .DateStart}}
+                <span class="inline-flex items-center text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                    {{derefStr .DateStart}}{{if .DateEnd}} &rarr; {{derefStr .DateEnd}}{{end}}
+                </span>
+                {{end}}
+                {{range .Tags}}
+                <span class="px-1.5 py-0.5 rounded-full text-xs font-medium text-white" style="background-color: {{.Color}}">{{.Name}}</span>
+                {{end}}
+            </div>
+        </div>
+        <div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onclick="editTodoItem({{.ID}})"
+                class="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            </button>
+            <button hx-delete="/todos/items/{{.ID}}" hx-target="#items-list" hx-swap="innerHTML" hx-confirm="Delete this item?"
+                class="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+            <div class="cursor-grab text-gray-300 hover:text-gray-500 p-1 drag-handle">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg>
+            </div>
+        </div>
+    </div>
+    {{end}}
+</div>
+<script>
+if (typeof Sortable !== 'undefined') {
+    initTodoSortable();
+}
+</script>
+{{else}}
+<div class="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-200">
+    <p class="text-gray-400">No items yet. Add one above!</p>
+</div>
+{{end}}
+{{end}}
+
+{{define "todo-item-edit-form"}}
+<h2 class="text-lg font-semibold text-gray-900 mb-4">Edit Task</h2>
+<form hx-put="/todos/items/{{.Item.ID}}" hx-target="#items-list" hx-swap="innerHTML"
+    hx-on::after-request="if(event.detail.successful) document.getElementById('edit-item-modal').classList.add('hidden')">
+    <div class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+            <input type="text" name="title" value="{{.Item.Title}}" required
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <textarea name="description" rows="2"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">{{.Item.Description}}</textarea>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Deadline</label>
+                <input type="date" name="deadline" value="{{derefStr .Item.Deadline}}"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                <input type="date" name="date_start" value="{{derefStr .Item.DateStart}}"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                <input type="date" name="date_end" value="{{derefStr .Item.DateEnd}}"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+            </div>
+        </div>
+        {{if .Tags}}
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Tags</label>
+            <div class="flex flex-wrap gap-2">
+                {{range .Tags}}
+                <label class="inline-flex items-center">
+                    <input type="checkbox" name="tag_ids" value="{{.ID}}" class="sr-only peer"
+                        {{if contains $.ItemTagIDs .ID}}checked{{end}}>
+                    <span class="px-2 py-1 rounded-full text-xs cursor-pointer border transition-colors peer-checked:text-white"
+                        style="border-color: {{.Color}}; {{if contains $.ItemTagIDs .ID}}background-color: {{.Color}}; color: white{{else}}color: {{.Color}}{{end}}"
+                        onclick="this.previousElementSibling.checked = !this.previousElementSibling.checked; this.style.backgroundColor = this.previousElementSibling.checked ? '{{.Color}}' : 'transparent'; this.style.color = this.previousElementSibling.checked ? 'white' : '{{.Color}}'">
+                        {{.Name}}
+                    </span>
+                </label>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+    </div>
+    <div class="flex justify-end space-x-3 mt-6">
+        <button type="button" onclick="document.getElementById('edit-item-modal').classList.add('hidden')"
+            class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+        <button type="submit"
+            class="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors">Save</button>
+    </div>
+</form>
+{{end}}

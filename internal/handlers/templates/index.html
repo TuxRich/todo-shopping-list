@@ -1,0 +1,55 @@
+{{define "content"}}
+<div class="space-y-8">
+    <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <a href="/todos" class="block bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">Todo Lists</h2>
+                    <p class="text-sm text-gray-500 mt-1">{{.TodoCount}} list{{if ne .TodoCount 1}}s{{end}}</p>
+                </div>
+                <div class="text-4xl">&#10003;</div>
+            </div>
+        </a>
+
+        <a href="/shopping" class="block bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">Shopping Lists</h2>
+                    <p class="text-sm text-gray-500 mt-1">{{.ShoppingCount}} list{{if ne .ShoppingCount 1}}s{{end}}</p>
+                </div>
+                <div class="text-4xl">&#128722;</div>
+            </div>
+        </a>
+    </div>
+
+    {{if .RecentTodos}}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Recent Todo Lists</h2>
+        <div class="space-y-2">
+            {{range .RecentTodos}}
+            <a href="/todos/{{.ID}}" class="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                <span class="font-medium text-gray-800">{{.Name}}</span>
+                <span class="text-sm text-gray-500">{{.DoneCount}}/{{.ItemCount}} done</span>
+            </a>
+            {{end}}
+        </div>
+    </div>
+    {{end}}
+
+    {{if .RecentShopping}}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Recent Shopping Lists</h2>
+        <div class="space-y-2">
+            {{range .RecentShopping}}
+            <a href="/shopping/{{.ID}}" class="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                <span class="font-medium text-gray-800">{{.Name}}</span>
+                <span class="text-sm text-gray-500">{{.DoneCount}}/{{.ItemCount}} items</span>
+            </a>
+            {{end}}
+        </div>
+    </div>
+    {{end}}
+</div>
+{{end}}

@@ -1,0 +1,82 @@
+{{define "content"}}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-900">Todo Lists</h1>
+        <button onclick="document.getElementById('new-list-modal').classList.remove('hidden')"
+            class="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors">
+            + New List
+        </button>
+    </div>
+
+    {{if .Lists}}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {{range .Lists}}
+        <a href="/todos/{{.ID}}" class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow block">
+            <div class="flex items-start justify-between">
+                <div class="flex-1 min-w-0">
+                    <h3 class="font-semibold text-gray-900 truncate">{{.Name}}</h3>
+                    {{if .Category}}
+                    <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium" style="background-color: {{.Category.Color}}20; color: {{.Category.Color}}">
+                        {{.Category.Icon}} {{.Category.Name}}
+                    </span>
+                    {{end}}
+                </div>
+            </div>
+            <div class="mt-3 flex items-center justify-between text-sm">
+                <span class="text-gray-500">{{.ItemCount}} item{{if ne .ItemCount 1}}s{{end}}</span>
+                {{if gt .ItemCount 0}}
+                <div class="flex items-center space-x-2">
+                    <div class="w-24 bg-gray-200 rounded-full h-1.5">
+                        <div class="bg-primary-500 h-1.5 rounded-full" style="width: {{pct .DoneCount .ItemCount}}%"></div>
+                    </div>
+                    <span class="text-gray-500">{{.DoneCount}}/{{.ItemCount}}</span>
+                </div>
+                {{end}}
+            </div>
+        </a>
+        {{end}}
+    </div>
+    {{else}}
+    <div class="text-center py-16 bg-white rounded-xl shadow-sm border border-gray-200">
+        <p class="text-gray-500 text-lg">No todo lists yet</p>
+        <p class="text-gray-400 text-sm mt-1">Create your first list to get started</p>
+    </div>
+    {{end}}
+</div>
+
+<div id="new-list-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onclick="event.stopPropagation()">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">New Todo List</h2>
+        <form hx-post="/todos" hx-target="body" hx-swap="outerHTML">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                    <input type="text" name="name" required autofocus
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select name="category_id" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+                        <option value="">None</option>
+                        {{range .Categories}}
+                        <option value="{{.ID}}">{{.Icon}} {{.Name}}</option>
+                        {{end}}
+                    </select>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button type="button" onclick="document.getElementById('new-list-modal').classList.add('hidden')"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+                <button type="submit"
+                    class="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors">Create</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.getElementById('new-list-modal').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.add('hidden');
+});
+</script>
+{{end}}

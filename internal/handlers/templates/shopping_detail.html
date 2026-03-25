@@ -1,0 +1,99 @@
+{{define "content"}}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <a href="/shopping" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            </a>
+            <h1 class="text-2xl font-bold text-gray-900">{{.List.Name}}</h1>
+            {{if .List.Category}}
+            <span class="px-2 py-0.5 rounded-full text-xs font-medium" style="background-color: {{.List.Category.Color}}20; color: {{.List.Category.Color}}">
+                {{.List.Category.Icon}} {{.List.Category.Name}}
+            </span>
+            {{end}}
+        </div>
+        <div class="flex items-center space-x-2">
+            <button onclick="document.getElementById('edit-list-modal').classList.remove('hidden')"
+                class="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            </button>
+            <button hx-delete="/shopping/{{.List.ID}}" hx-confirm="Delete this list and all its items?" hx-target="body" hx-swap="outerHTML"
+                class="text-gray-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <form hx-post="/shopping/{{.List.ID}}/items" hx-target="#items-list" hx-swap="innerHTML" hx-boost="false"
+        hx-on::after-request="if(event.detail.successful) { this.reset(); document.getElementById('history-results').classList.add('hidden'); }"
+        class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div class="flex flex-col sm:flex-row gap-3">
+            <div class="flex-1 relative">
+                <input type="text" name="name" placeholder="Add item..." required autocomplete="off"
+                    id="item-name-input"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+                <div id="history-results" class="hidden absolute z-10 mt-1 w-full bg-white rounded-lg shadow-lg border border-gray-200 max-h-48 overflow-y-auto">
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <input type="number" name="quantity" value="1" min="1" class="w-16 rounded-lg border border-gray-300 px-2 py-2 text-sm text-center focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none" title="Quantity">
+                <input type="text" name="unit" placeholder="unit" class="w-20 rounded-lg border border-gray-300 px-2 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none" title="Unit (kg, pcs, etc.)">
+                <button type="submit" class="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors whitespace-nowrap">Add</button>
+            </div>
+        </div>
+    </form>
+
+    <div class="flex items-center justify-end gap-2">
+        <span class="text-xs text-gray-400">Sort:</span>
+        <a href="/shopping/{{.List.ID}}" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors {{if ne .Sort "name"}}bg-primary-100 text-primary-700{{else}}text-gray-500 hover:bg-gray-100{{end}}">Manual</a>
+        <a href="/shopping/{{.List.ID}}?sort=name" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors {{if eq .Sort "name"}}bg-primary-100 text-primary-700{{else}}text-gray-500 hover:bg-gray-100{{end}}">Name</a>
+    </div>
+
+    <div id="items-list">
+        {{template "shopping-items-list" .}}
+    </div>
+</div>
+
+<div id="edit-list-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onclick="event.stopPropagation()">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Edit List</h2>
+        <form hx-put="/shopping/{{.List.ID}}" hx-target="body" hx-swap="outerHTML">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                    <input type="text" name="name" value="{{.List.Name}}" required
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select name="category_id" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+                        <option value="">None</option>
+                        {{range .Categories}}
+                        <option value="{{.ID}}" {{if and $.List.CategoryID (eq (derefInt64 $.List.CategoryID) .ID)}}selected{{end}}>{{.Icon}} {{.Name}}</option>
+                        {{end}}
+                    </select>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button type="button" onclick="document.getElementById('edit-list-modal').classList.add('hidden')"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+                <button type="submit"
+                    class="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.getElementById('edit-list-modal').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.add('hidden');
+});
+document.addEventListener('click', function(e) {
+    var results = document.getElementById('history-results');
+    var input = document.getElementById('item-name-input');
+    if (results && !results.contains(e.target) && e.target !== input) {
+        results.classList.add('hidden');
+    }
+});
+</script>
+{{end}}

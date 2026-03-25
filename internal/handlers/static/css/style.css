@@ -1,0 +1,34 @@
+@media (max-width: 640px) {
+    .group:hover .group-hover\:opacity-100 {
+        opacity: 1;
+    }
+}
+
+@media (pointer: coarse) {
+    .group .opacity-0 {
+        opacity: 1 !important;
+    }
+}
+
+.sortable-ghost {
+    opacity: 0.4;
+    background-color: #eef2ff;
+}
+
+.sortable-chosen {
+    background-color: #f5f3ff;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+
+.htmx-indicator {
+    opacity: 0;
+    transition: opacity 200ms ease-in;
+}
+
+.htmx-request .htmx-indicator {
+    opacity: 1;
+}
+
+.htmx-request.htmx-indicator {
+    opacity: 1;
+}

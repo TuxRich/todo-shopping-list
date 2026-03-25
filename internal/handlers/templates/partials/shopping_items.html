@@ -1,0 +1,135 @@
+{{define "shopping-items-list"}}
+{{if .Items}}
+<div class="bg-white rounded-xl shadow-sm border border-gray-200 divide-y divide-gray-100" id="shopping-sortable">
+    {{range .Items}}
+    <div class="flex items-center gap-3 p-4 group {{if .Purchased}}opacity-60{{end}}" data-id="{{.ID}}">
+        <button hx-post="/shopping/items/{{.ID}}/toggle" hx-target="#items-list" hx-swap="innerHTML"
+            class="flex-shrink-0 w-5 h-5 rounded border-2 {{if .Purchased}}bg-primary-500 border-primary-500{{else}}border-gray-300 hover:border-primary-500{{end}} flex items-center justify-center transition-colors">
+            {{if .Purchased}}
+            <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+            {{end}}
+        </button>
+        <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+                <span class="text-sm font-medium text-gray-900 {{if .Purchased}}line-through text-gray-500{{end}}">{{.Name}}</span>
+                {{if or (gt .Quantity 1) (ne .Unit "")}}
+                <span class="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                    {{.Quantity}}{{if ne .Unit ""}} {{.Unit}}{{end}}
+                </span>
+                {{end}}
+            </div>
+            <div class="flex flex-wrap items-center gap-1 mt-0.5">
+                {{if .Category}}
+                <span class="text-xs px-1.5 py-0.5 rounded" style="background-color: {{.Category.Color}}20; color: {{.Category.Color}}">{{.Category.Icon}} {{.Category.Name}}</span>
+                {{end}}
+                {{range .Tags}}
+                <span class="px-1.5 py-0.5 rounded-full text-xs font-medium text-white" style="background-color: {{.Color}}">{{.Name}}</span>
+                {{end}}
+            </div>
+        </div>
+        <div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onclick="editShoppingItem({{.ID}})"
+                class="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            </button>
+            <button hx-delete="/shopping/items/{{.ID}}" hx-target="#items-list" hx-swap="innerHTML" hx-confirm="Delete this item?"
+                class="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+            {{if ne $.Sort "name"}}
+            <div class="cursor-grab text-gray-300 hover:text-gray-500 p-1 drag-handle">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg>
+            </div>
+            {{end}}
+        </div>
+    </div>
+    {{end}}
+</div>
+{{if ne .Sort "name"}}
+<script>
+if (typeof Sortable !== 'undefined') {
+    initShoppingSortable();
+}
+</script>
+{{end}}
+{{else}}
+<div class="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-200">
+    <p class="text-gray-400">No items yet. Add one above!</p>
+</div>
+{{end}}
+{{end}}
+
+{{define "shopping-history-results"}}
+{{if .}}
+{{range .}}
+<button type="button"
+    onclick="selectHistoryItem(this)"
+    data-name="{{.Name}}" data-quantity="{{.DefaultQuantity}}" data-unit="{{.Unit}}"
+    class="w-full text-left px-3 py-2 hover:bg-primary-50 text-sm flex items-center justify-between transition-colors">
+    <span class="font-medium text-gray-800">{{.Name}}</span>
+    <span class="text-xs text-gray-400">{{.DefaultQuantity}}{{if ne .Unit ""}} {{.Unit}}{{end}} &middot; used {{.UseCount}}x</span>
+</button>
+{{end}}
+{{else}}
+<div class="px-3 py-2 text-sm text-gray-400">No previous items found</div>
+{{end}}
+{{end}}
+
+{{define "shopping-item-edit-form"}}
+<h2 class="text-lg font-semibold text-gray-900 mb-4">Edit Item</h2>
+<form hx-put="/shopping/items/{{.Item.ID}}" hx-target="#items-list" hx-swap="innerHTML"
+    hx-on::after-request="if(event.detail.successful) document.getElementById('edit-shopping-modal').classList.add('hidden')">
+    <div class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+            <input type="text" name="name" value="{{.Item.Name}}" required
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                <input type="number" name="quantity" value="{{.Item.Quantity}}" min="1"
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                <input type="text" name="unit" value="{{.Item.Unit}}" placeholder="kg, pcs, etc."
+                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+            </div>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+            <select name="category_id" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none">
+                <option value="">None</option>
+                {{range .Categories}}
+                <option value="{{.ID}}" {{if and $.Item.CategoryID (eq (derefInt64 $.Item.CategoryID) .ID)}}selected{{end}}>{{.Icon}} {{.Name}}</option>
+                {{end}}
+            </select>
+        </div>
+        {{if .Tags}}
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Tags</label>
+            <div class="flex flex-wrap gap-2">
+                {{range .Tags}}
+                <label class="inline-flex items-center">
+                    <input type="checkbox" name="tag_ids" value="{{.ID}}" class="sr-only peer"
+                        {{if contains $.ItemTagIDs .ID}}checked{{end}}>
+                    <span class="px-2 py-1 rounded-full text-xs cursor-pointer border transition-colors peer-checked:text-white"
+                        style="border-color: {{.Color}}; {{if contains $.ItemTagIDs .ID}}background-color: {{.Color}}; color: white{{else}}color: {{.Color}}{{end}}"
+                        onclick="this.previousElementSibling.checked = !this.previousElementSibling.checked; this.style.backgroundColor = this.previousElementSibling.checked ? '{{.Color}}' : 'transparent'; this.style.color = this.previousElementSibling.checked ? 'white' : '{{.Color}}'">
+                        {{.Name}}
+                    </span>
+                </label>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+    </div>
+    <div class="flex justify-end space-x-3 mt-6">
+        <button type="button" onclick="document.getElementById('edit-shopping-modal').classList.add('hidden')"
+            class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+        <button type="submit"
+            class="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors">Save</button>
+    </div>
+</form>
+{{end}}
