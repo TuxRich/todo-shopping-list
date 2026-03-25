@@ -1,34 +1,41 @@
-# ToDo & Shopping List
+# TuxRich Home Assistant Add-ons
 
-A web-based todo and shopping list manager built in Go with SQLite. Designed to run as a Home Assistant Add-on with Ingress support.
+## ToDo & Shopping List
 
-## Features
+A web-based todo and shopping list manager built in Go with SQLite, designed as a Home Assistant Add-on.
+
+### Installation
+
+1. In Home Assistant, go to **Settings > Add-ons > Add-on Store**.
+2. Click the three-dot menu (top right) and select **Repositories**.
+3. Add this repository URL: `https://github.com/TuxRich/todo-shopping-list`
+4. Find "ToDo & Shopping List" in the store and click **Install**.
+5. Start the add-on and open the **Web UI** from the sidebar.
+
+### Features
 
 **Todo Lists**
-- Create multiple todo lists with categories
-- Items with optional deadlines and date ranges (start/end)
+- Create multiple lists with categories
+- Items with optional deadlines and date ranges
 - Tag items for easy filtering
 - Drag-and-drop reordering
-- Mark items complete/incomplete
 
 **Shopping Lists**
-- Create multiple shopping lists with categories
-- Item quantity and unit tracking (e.g. "3 kg")
-- Quick re-add from purchase history with autocomplete
-- Mark items as purchased
+- Item quantity and unit tracking
+- Quick re-add from purchase history (autocomplete search)
+- Duplicate detection: re-adding an existing item unchecks it instead
+- Sort by name or manual order
 - Item count shown on list overview
 
 **General**
-- Categories (name, color, icon) for organizing lists and items
-- Tags (name, color) for labeling individual items
+- Categories (name, color, icon) and tags (name, color)
 - Full REST API at `/api/v1/` for external integrations
-- Home Assistant Add-on with Ingress support
+- Home Assistant Ingress support (embedded in sidebar)
 
-## Running Locally
-
-Requirements: Go 1.21+
+### Running Standalone (without Home Assistant)
 
 ```bash
+cd todo-shopping-list
 go run .
 ```
 
@@ -38,62 +45,22 @@ Environment variables:
 - `PORT` - Server port (default: `8099`)
 - `DB_PATH` - SQLite database path (default: `./data/todo.db`)
 
-## Home Assistant Add-on
-
-### Installation
-
-1. Copy this repository to your Home Assistant addons directory, or add it as a repository in the Add-on Store.
-2. Install the "ToDo & Shopping List" add-on.
-3. Start the add-on.
-4. Access via the sidebar panel (Ingress).
-
-### Manual Docker Build
-
-```bash
-docker build -t todo-app .
-docker run -p 8099:8099 -v todo-data:/data todo-app
-```
-
-## REST API
+### REST API
 
 All endpoints return JSON. Base path: `/api/v1/`
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/v1/todo-lists` | List all todo lists |
-| POST | `/api/v1/todo-lists` | Create a todo list |
-| GET | `/api/v1/todo-lists/:id` | Get a todo list |
-| PUT | `/api/v1/todo-lists/:id` | Update a todo list |
-| DELETE | `/api/v1/todo-lists/:id` | Delete a todo list |
-| GET | `/api/v1/todo-lists/:id/items` | List items in a todo list |
-| POST | `/api/v1/todo-lists/:id/items` | Add an item to a todo list |
-| GET | `/api/v1/todo-items/:id` | Get a todo item |
-| PUT | `/api/v1/todo-items/:id` | Update a todo item |
-| DELETE | `/api/v1/todo-items/:id` | Delete a todo item |
-| GET | `/api/v1/shopping-lists` | List all shopping lists |
-| POST | `/api/v1/shopping-lists` | Create a shopping list |
-| GET | `/api/v1/shopping-lists/:id` | Get a shopping list |
-| PUT | `/api/v1/shopping-lists/:id` | Update a shopping list |
-| DELETE | `/api/v1/shopping-lists/:id` | Delete a shopping list |
-| GET | `/api/v1/shopping-lists/:id/items` | List items in a shopping list |
-| POST | `/api/v1/shopping-lists/:id/items` | Add an item to a shopping list |
-| GET | `/api/v1/shopping-items/:id` | Get a shopping item |
-| PUT | `/api/v1/shopping-items/:id` | Update a shopping item |
-| DELETE | `/api/v1/shopping-items/:id` | Delete a shopping item |
+| GET/POST | `/api/v1/todo-lists` | List / create todo lists |
+| GET/PUT/DELETE | `/api/v1/todo-lists/:id` | Get / update / delete a todo list |
+| GET/POST | `/api/v1/todo-lists/:id/items` | List / add todo items |
+| GET/PUT/DELETE | `/api/v1/todo-items/:id` | Get / update / delete a todo item |
+| GET/POST | `/api/v1/shopping-lists` | List / create shopping lists |
+| GET/PUT/DELETE | `/api/v1/shopping-lists/:id` | Get / update / delete a shopping list |
+| GET/POST | `/api/v1/shopping-lists/:id/items` | List / add shopping items |
+| GET/PUT/DELETE | `/api/v1/shopping-items/:id` | Get / update / delete a shopping item |
 | GET | `/api/v1/shopping-history?q=...` | Search shopping history |
-| GET | `/api/v1/categories` | List all categories |
-| POST | `/api/v1/categories` | Create a category |
-| PUT | `/api/v1/categories/:id` | Update a category |
-| DELETE | `/api/v1/categories/:id` | Delete a category |
-| GET | `/api/v1/tags` | List all tags |
-| POST | `/api/v1/tags` | Create a tag |
-| PUT | `/api/v1/tags/:id` | Update a tag |
-| DELETE | `/api/v1/tags/:id` | Delete a tag |
-
-## Tech Stack
-
-- **Go** with chi router
-- **SQLite** via modernc.org/sqlite (pure Go, no CGO)
-- **HTMX** for interactive UI
-- **Tailwind CSS** for styling
-- **SortableJS** for drag-and-drop
+| GET/POST | `/api/v1/categories` | List / create categories |
+| GET/PUT/DELETE | `/api/v1/categories/:id` | Get / update / delete a category |
+| GET/POST | `/api/v1/tags` | List / create tags |
+| GET/PUT/DELETE | `/api/v1/tags/:id` | Get / update / delete a tag |
