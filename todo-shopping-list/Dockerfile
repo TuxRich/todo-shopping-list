@@ -1,5 +1,5 @@
-ARG BUILD_FROM=golang:1.22-alpine
-FROM ${BUILD_FROM} AS builder
+ARG BUILD_FROM
+FROM golang:1.22-alpine AS builder
 
 WORKDIR /build
 COPY go.mod go.sum ./
@@ -7,7 +7,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /todo-app .
 
-FROM alpine:3.19
+FROM ${BUILD_FROM}
 
 RUN apk add --no-cache ca-certificates tzdata
 
