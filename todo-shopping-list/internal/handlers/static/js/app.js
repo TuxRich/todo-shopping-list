@@ -11,7 +11,7 @@ function initTodoSortable() {
                 return item.getAttribute('data-id');
             });
             var listId = window.location.pathname.split('/').pop();
-            fetch('/todos/' + listId + '/reorder', {
+            fetch('todos/' + listId + '/reorder', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({item_ids: ids.map(Number)})
@@ -33,7 +33,7 @@ function initShoppingSortable() {
                 return item.getAttribute('data-id');
             });
             var listId = window.location.pathname.split('/').pop();
-            fetch('/shopping/' + listId + '/reorder', {
+            fetch('shopping/' + listId + '/reorder', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({item_ids: ids.map(Number)})
@@ -58,7 +58,7 @@ function selectHistoryItem(btn) {
 }
 
 function editTodoItem(itemId) {
-    fetch('/todos/items/' + itemId)
+    fetch('todos/items/' + itemId)
         .then(function(r) { return r.text(); })
         .then(function(html) {
             document.getElementById('edit-item-content').innerHTML = html;
@@ -68,7 +68,7 @@ function editTodoItem(itemId) {
 }
 
 function editShoppingItem(itemId) {
-    fetch('/shopping/items/' + itemId)
+    fetch('shopping/items/' + itemId)
         .then(function(r) { return r.text(); })
         .then(function(html) {
             var modal = document.getElementById('edit-shopping-modal');
@@ -90,7 +90,7 @@ function editShoppingItem(itemId) {
 
 function editCategory(id, name, color, icon) {
     var html = '<h2 class="text-lg font-semibold text-gray-900 mb-4">Edit Category</h2>' +
-        '<form hx-put="/settings/categories/' + id + '" hx-target="#categories-list" hx-swap="innerHTML"' +
+        '<form hx-put="settings/categories/' + id + '" hx-target="#categories-list" hx-swap="innerHTML"' +
         ' hx-on::after-request="if(event.detail.successful) document.getElementById(\'edit-modal\').classList.add(\'hidden\')">' +
         '<div class="space-y-4">' +
         '<div><label class="block text-sm font-medium text-gray-700 mb-1">Name</label>' +
@@ -109,7 +109,7 @@ function editCategory(id, name, color, icon) {
 
 function editTag(id, name, color) {
     var html = '<h2 class="text-lg font-semibold text-gray-900 mb-4">Edit Tag</h2>' +
-        '<form hx-put="/settings/tags/' + id + '" hx-target="#tags-list" hx-swap="innerHTML"' +
+        '<form hx-put="settings/tags/' + id + '" hx-target="#tags-list" hx-swap="innerHTML"' +
         ' hx-on::after-request="if(event.detail.successful) document.getElementById(\'edit-modal\').classList.add(\'hidden\')">' +
         '<div class="space-y-4">' +
         '<div><label class="block text-sm font-medium text-gray-700 mb-1">Name</label>' +
@@ -157,7 +157,7 @@ function showEditModal(html) {
             return;
         }
         timer = setTimeout(function() {
-            fetch('/shopping/history/search?name=' + encodeURIComponent(q))
+            fetch('shopping/history/search?name=' + encodeURIComponent(q))
                 .then(function(r) { return r.text(); })
                 .then(function(html) {
                     results.innerHTML = html;

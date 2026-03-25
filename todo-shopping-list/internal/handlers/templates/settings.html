@@ -32,7 +32,7 @@
 <div id="new-cat-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onclick="event.stopPropagation()">
         <h2 class="text-lg font-semibold text-gray-900 mb-4">New Category</h2>
-        <form hx-post="/settings/categories" hx-target="#categories-list" hx-swap="innerHTML"
+        <form hx-post="settings/categories" hx-target="#categories-list" hx-swap="innerHTML"
             hx-on::after-request="if(event.detail.successful) { document.getElementById('new-cat-modal').classList.add('hidden'); this.reset(); }">
             <div class="space-y-4">
                 <div>
@@ -61,7 +61,7 @@
 <div id="new-tag-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onclick="event.stopPropagation()">
         <h2 class="text-lg font-semibold text-gray-900 mb-4">New Tag</h2>
-        <form hx-post="/settings/tags" hx-target="#tags-list" hx-swap="innerHTML"
+        <form hx-post="settings/tags" hx-target="#tags-list" hx-swap="innerHTML"
             hx-on::after-request="if(event.detail.successful) { document.getElementById('new-tag-modal').classList.add('hidden'); this.reset(); }">
             <div class="space-y-4">
                 <div>

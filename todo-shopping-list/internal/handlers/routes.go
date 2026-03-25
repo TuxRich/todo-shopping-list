@@ -210,12 +210,18 @@ func getIngressPath(r *http.Request) string {
 	return ""
 }
 
+func redirectURL(r *http.Request, path string) string {
+	return getIngressPath(r) + path
+}
+
 func (h *Handler) render(w http.ResponseWriter, r *http.Request, page string, data map[string]interface{}) {
 	if data == nil {
 		data = map[string]interface{}{}
 	}
 	basePath := getIngressPath(r)
-	if basePath != "" && !strings.HasSuffix(basePath, "/") {
+	if basePath == "" {
+		basePath = "/"
+	} else if !strings.HasSuffix(basePath, "/") {
 		basePath += "/"
 	}
 	data["BasePath"] = basePath

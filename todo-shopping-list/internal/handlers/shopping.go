@@ -33,7 +33,7 @@ func (h *Handler) handleCreateShoppingList(w http.ResponseWriter, r *http.Reques
 		}
 	}
 	h.db.CreateShoppingList(list)
-	http.Redirect(w, r, "/shopping/"+strconv.FormatInt(list.ID, 10), http.StatusSeeOther)
+	http.Redirect(w, r, redirectURL(r, "/shopping/"+strconv.FormatInt(list.ID, 10)), http.StatusSeeOther)
 }
 
 func (h *Handler) handleShoppingDetail(w http.ResponseWriter, r *http.Request) {
@@ -70,13 +70,13 @@ func (h *Handler) handleUpdateShoppingList(w http.ResponseWriter, r *http.Reques
 		}
 	}
 	h.db.UpdateShoppingList(list)
-	http.Redirect(w, r, "/shopping/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+	http.Redirect(w, r, redirectURL(r, "/shopping/"+strconv.FormatInt(id, 10)), http.StatusSeeOther)
 }
 
 func (h *Handler) handleDeleteShoppingList(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	h.db.DeleteShoppingList(id)
-	http.Redirect(w, r, "/shopping", http.StatusSeeOther)
+	http.Redirect(w, r, redirectURL(r, "/shopping"), http.StatusSeeOther)
 }
 
 func (h *Handler) handleCreateShoppingItem(w http.ResponseWriter, r *http.Request) {

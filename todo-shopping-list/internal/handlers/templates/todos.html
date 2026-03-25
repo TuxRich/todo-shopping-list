@@ -11,7 +11,7 @@
     {{if .Lists}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {{range .Lists}}
-        <a href="/todos/{{.ID}}" class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow block">
+        <a href="todos/{{.ID}}" class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow block">
             <div class="flex items-start justify-between">
                 <div class="flex-1 min-w-0">
                     <h3 class="font-semibold text-gray-900 truncate">{{.Name}}</h3>
@@ -47,7 +47,7 @@
 <div id="new-list-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onclick="event.stopPropagation()">
         <h2 class="text-lg font-semibold text-gray-900 mb-4">New Todo List</h2>
-        <form hx-post="/todos" hx-target="body" hx-swap="outerHTML">
+        <form hx-post="todos" hx-target="body" hx-swap="outerHTML">
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>

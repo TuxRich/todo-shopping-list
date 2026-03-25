@@ -60,7 +60,7 @@ func (h *Handler) handleCreateTodoList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	h.db.CreateTodoList(list)
-	http.Redirect(w, r, "/todos/"+strconv.FormatInt(list.ID, 10), http.StatusSeeOther)
+	http.Redirect(w, r, redirectURL(r, "/todos/"+strconv.FormatInt(list.ID, 10)), http.StatusSeeOther)
 }
 
 func (h *Handler) handleTodoDetail(w http.ResponseWriter, r *http.Request) {
@@ -95,13 +95,13 @@ func (h *Handler) handleUpdateTodoList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	h.db.UpdateTodoList(list)
-	http.Redirect(w, r, "/todos/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
+	http.Redirect(w, r, redirectURL(r, "/todos/"+strconv.FormatInt(id, 10)), http.StatusSeeOther)
 }
 
 func (h *Handler) handleDeleteTodoList(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	h.db.DeleteTodoList(id)
-	http.Redirect(w, r, "/todos", http.StatusSeeOther)
+	http.Redirect(w, r, redirectURL(r, "/todos"), http.StatusSeeOther)
 }
 
 func (h *Handler) handleCreateTodoItem(w http.ResponseWriter, r *http.Request) {
