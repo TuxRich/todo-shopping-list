@@ -75,8 +75,8 @@ function editShoppingItem(itemId) {
             if (!modal) {
                 modal = document.createElement('div');
                 modal.id = 'edit-shopping-modal';
-                modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4';
-                modal.innerHTML = '<div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-6" onclick="event.stopPropagation()" id="edit-shopping-content"></div>';
+                modal.className = 'fixed inset-0 bg-[#11111B]/70 flex items-center justify-center z-50 p-4';
+                modal.innerHTML = '<div class="bg-[#313244] rounded-xl shadow-xl w-full max-w-lg p-6 border border-[#45475A]" onclick="event.stopPropagation()" id="edit-shopping-content"></div>';
                 modal.addEventListener('click', function(e) {
                     if (e.target === modal) modal.classList.add('hidden');
                 });
@@ -89,37 +89,37 @@ function editShoppingItem(itemId) {
 }
 
 function editCategory(id, name, color, icon) {
-    var html = '<h2 class="text-lg font-semibold text-gray-900 mb-4">Edit Category</h2>' +
+    var html = '<h2 class="text-lg font-semibold text-[#CDD6F4] mb-4">Edit Category</h2>' +
         '<form hx-put="settings/categories/' + id + '" hx-target="#categories-list" hx-swap="innerHTML"' +
         ' hx-on::after-request="if(event.detail.successful) document.getElementById(\'edit-modal\').classList.add(\'hidden\')">' +
         '<div class="space-y-4">' +
-        '<div><label class="block text-sm font-medium text-gray-700 mb-1">Name</label>' +
-        '<input type="text" name="name" value="' + name + '" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"></div>' +
-        '<div><label class="block text-sm font-medium text-gray-700 mb-1">Color</label>' +
-        '<input type="color" name="color" value="' + color + '" class="w-full h-10 rounded-lg border border-gray-300 cursor-pointer"></div>' +
-        '<div><label class="block text-sm font-medium text-gray-700 mb-1">Icon</label>' +
-        '<input type="text" name="icon" value="' + icon + '" maxlength="4" class="w-20 rounded-lg border border-gray-300 px-3 py-2 text-sm text-center focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"></div>' +
+        '<div><label class="block text-sm font-medium text-[#BAC2DE] mb-1">Name</label>' +
+        '<input type="text" name="name" value="' + name + '" required class="w-full rounded-lg border border-[#585B70] bg-[#1E1E2E] px-3 py-2 text-sm text-[#CDD6F4] focus:ring-2 focus:ring-[#89B4FA] focus:border-[#89B4FA] outline-none"></div>' +
+        '<div><label class="block text-sm font-medium text-[#BAC2DE] mb-1">Color</label>' +
+        '<input type="color" name="color" value="' + color + '" class="w-full h-10 rounded-lg border border-[#585B70] bg-[#1E1E2E] cursor-pointer"></div>' +
+        '<div><label class="block text-sm font-medium text-[#BAC2DE] mb-1">Icon</label>' +
+        '<input type="text" name="icon" value="' + icon + '" maxlength="4" class="w-20 rounded-lg border border-[#585B70] bg-[#1E1E2E] px-3 py-2 text-sm text-center text-[#CDD6F4] focus:ring-2 focus:ring-[#89B4FA] focus:border-[#89B4FA] outline-none"></div>' +
         '</div>' +
         '<div class="flex justify-end space-x-3 mt-6">' +
-        '<button type="button" onclick="document.getElementById(\'edit-modal\').classList.add(\'hidden\')" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>' +
-        '<button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors">Save</button>' +
+        '<button type="button" onclick="document.getElementById(\'edit-modal\').classList.add(\'hidden\')" class="px-4 py-2 text-sm font-medium text-[#BAC2DE] hover:bg-[#45475A] rounded-lg transition-colors">Cancel</button>' +
+        '<button type="submit" class="px-4 py-2 text-sm font-medium text-[#11111B] bg-[#89B4FA] hover:bg-[#74C7EC] rounded-lg transition-colors">Save</button>' +
         '</div></form>';
     showEditModal(html);
 }
 
 function editTag(id, name, color) {
-    var html = '<h2 class="text-lg font-semibold text-gray-900 mb-4">Edit Tag</h2>' +
+    var html = '<h2 class="text-lg font-semibold text-[#CDD6F4] mb-4">Edit Tag</h2>' +
         '<form hx-put="settings/tags/' + id + '" hx-target="#tags-list" hx-swap="innerHTML"' +
         ' hx-on::after-request="if(event.detail.successful) document.getElementById(\'edit-modal\').classList.add(\'hidden\')">' +
         '<div class="space-y-4">' +
-        '<div><label class="block text-sm font-medium text-gray-700 mb-1">Name</label>' +
-        '<input type="text" name="name" value="' + name + '" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"></div>' +
-        '<div><label class="block text-sm font-medium text-gray-700 mb-1">Color</label>' +
-        '<input type="color" name="color" value="' + color + '" class="w-full h-10 rounded-lg border border-gray-300 cursor-pointer"></div>' +
+        '<div><label class="block text-sm font-medium text-[#BAC2DE] mb-1">Name</label>' +
+        '<input type="text" name="name" value="' + name + '" required class="w-full rounded-lg border border-[#585B70] bg-[#1E1E2E] px-3 py-2 text-sm text-[#CDD6F4] focus:ring-2 focus:ring-[#89B4FA] focus:border-[#89B4FA] outline-none"></div>' +
+        '<div><label class="block text-sm font-medium text-[#BAC2DE] mb-1">Color</label>' +
+        '<input type="color" name="color" value="' + color + '" class="w-full h-10 rounded-lg border border-[#585B70] bg-[#1E1E2E] cursor-pointer"></div>' +
         '</div>' +
         '<div class="flex justify-end space-x-3 mt-6">' +
-        '<button type="button" onclick="document.getElementById(\'edit-modal\').classList.add(\'hidden\')" class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>' +
-        '<button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors">Save</button>' +
+        '<button type="button" onclick="document.getElementById(\'edit-modal\').classList.add(\'hidden\')" class="px-4 py-2 text-sm font-medium text-[#BAC2DE] hover:bg-[#45475A] rounded-lg transition-colors">Cancel</button>' +
+        '<button type="submit" class="px-4 py-2 text-sm font-medium text-[#11111B] bg-[#89B4FA] hover:bg-[#74C7EC] rounded-lg transition-colors">Save</button>' +
         '</div></form>';
     showEditModal(html);
 }
@@ -129,8 +129,8 @@ function showEditModal(html) {
     if (!modal) {
         modal = document.createElement('div');
         modal.id = 'edit-modal';
-        modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4';
-        modal.innerHTML = '<div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onclick="event.stopPropagation()" id="edit-modal-content"></div>';
+        modal.className = 'fixed inset-0 bg-[#11111B]/70 flex items-center justify-center z-50 p-4';
+        modal.innerHTML = '<div class="bg-[#313244] rounded-xl shadow-xl w-full max-w-md p-6 border border-[#45475A]" onclick="event.stopPropagation()" id="edit-modal-content"></div>';
         modal.addEventListener('click', function(e) {
             if (e.target === modal) modal.classList.add('hidden');
         });
@@ -141,7 +141,6 @@ function showEditModal(html) {
     htmx.process(document.getElementById('edit-modal-content'));
 }
 
-// Shopping history autocomplete via plain fetch (avoids hx-boost conflicts)
 (function() {
     var timer = null;
     document.addEventListener('input', function(e) {

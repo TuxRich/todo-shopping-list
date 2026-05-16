@@ -12,12 +12,12 @@
 
 .sortable-ghost {
     opacity: 0.4;
-    background-color: #eef2ff;
+    background-color: #45475A;
 }
 
 .sortable-chosen {
-    background-color: #f5f3ff;
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    background-color: #313244;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3);
 }
 
 .htmx-indicator {
@@ -31,4 +31,13 @@
 
 .htmx-request.htmx-indicator {
     opacity: 1;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.8);
+}
+
+select option {
+    background-color: #1E1E2E;
+    color: #CDD6F4;
 }
