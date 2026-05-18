@@ -9,6 +9,10 @@ arch:
   - armv7
 ingress: true
 ingress_port: 8099
+ports:
+  8099/tcp: 8099
+ports_description:
+  8099/tcp: "REST API"
 panel_title: "ToDo & Shopping"
 panel_icon: "mdi:clipboard-check-outline"
 init: false
