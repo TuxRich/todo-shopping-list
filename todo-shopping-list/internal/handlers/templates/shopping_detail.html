@@ -45,8 +45,9 @@
 
     <div class="flex items-center justify-end gap-2">
         <span class="text-xs text-ctp-overlay1">Sort:</span>
-        <a href="shopping/{{.List.ID}}" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors {{if ne .Sort "name"}}bg-ctp-blue/20 text-ctp-blue{{else}}text-ctp-overlay1 hover:bg-ctp-surface0{{end}}">Manual</a>
-        <a href="shopping/{{.List.ID}}?sort=name" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors {{if eq .Sort "name"}}bg-ctp-blue/20 text-ctp-blue{{else}}text-ctp-overlay1 hover:bg-ctp-surface0{{end}}">Name</a>
+        <a href="shopping/{{.List.ID}}?sort=manual" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors {{if eq .Sort "manual"}}bg-ctp-blue/20 text-ctp-blue{{else}}text-ctp-overlay1 hover:bg-ctp-surface0{{end}}">Manual</a>
+        <a href="shopping/{{.List.ID}}" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors {{if and (ne .Sort "manual") (ne .Sort "category")}}bg-ctp-blue/20 text-ctp-blue{{else}}text-ctp-overlay1 hover:bg-ctp-surface0{{end}}">Name</a>
+        <a href="shopping/{{.List.ID}}?sort=category" class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors {{if eq .Sort "category"}}bg-ctp-blue/20 text-ctp-blue{{else}}text-ctp-overlay1 hover:bg-ctp-surface0{{end}}">Category</a>
     </div>
 
     <div id="items-list">
