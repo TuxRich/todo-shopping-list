@@ -95,9 +95,12 @@ func (db *DB) DeleteShoppingList(id int64) error {
 }
 
 func (db *DB) GetShoppingItems(listID int64, sort string) ([]ShoppingItem, error) {
-	orderClause := "si.purchased ASC, si.sort_order ASC, si.created_at DESC"
-	if sort == "name" {
-		orderClause = "si.purchased ASC, LOWER(si.name) ASC"
+	orderClause := "si.purchased ASC, LOWER(si.name) ASC"
+	switch sort {
+	case "manual":
+		orderClause = "si.purchased ASC, si.sort_order ASC, si.created_at DESC"
+	case "category":
+		orderClause = "si.purchased ASC, c.name IS NULL ASC, LOWER(c.name) ASC, LOWER(si.name) ASC"
 	}
 	rows, err := db.conn.Query(`
 		SELECT si.id, si.list_id, si.name, si.quantity, si.unit, si.purchased,
