@@ -1,3 +1,12 @@
+## 1.1.0
+
+- Shopping lists now sort by name by default instead of manual order
+- Added a Category sort option for shopping lists (groups items by category)
+
+## 1.0.3
+
+- Exposed the REST API on host port 8099 for external integrations (e.g. Home Assistant automations)
+
 ## 1.0.2
 
 - Catppuccin Mocha dark theme to match Home Assistant styling
