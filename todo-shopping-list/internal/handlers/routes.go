@@ -5,6 +5,7 @@ import (
 	"embed"
 	"html/template"
 	"io/fs"
+	"log"
 	"net/http"
 	"strings"
 
@@ -212,6 +213,28 @@ func getIngressPath(r *http.Request) string {
 
 func redirectURL(r *http.Request, path string) string {
 	return getIngressPath(r) + path
+}
+
+// requiredField returns the trimmed value of a form field. When the field is
+// empty it writes a 400 and reports false, so a browser that skips the client
+// side "required" check cannot store a blank record.
+func requiredField(w http.ResponseWriter, r *http.Request, field, label string) (string, bool) {
+	value := strings.TrimSpace(r.FormValue(field))
+	if value == "" {
+		http.Error(w, label+" is required", http.StatusBadRequest)
+		return "", false
+	}
+	return value, true
+}
+
+// dbError reports whether err is non-nil, writing a 500 and logging the cause.
+func dbError(w http.ResponseWriter, err error) bool {
+	if err == nil {
+		return false
+	}
+	log.Printf("database error: %v", err)
+	http.Error(w, "Database error", http.StatusInternalServerError)
+	return true
 }
 
 func (h *Handler) render(w http.ResponseWriter, r *http.Request, page string, data map[string]interface{}) {

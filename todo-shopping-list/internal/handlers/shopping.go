@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"todo-app/internal/database"
 
@@ -12,8 +13,14 @@ import (
 )
 
 func (h *Handler) handleShoppingLists(w http.ResponseWriter, r *http.Request) {
-	lists, _ := h.db.GetShoppingLists()
-	categories, _ := h.db.GetCategories()
+	lists, err := h.db.GetShoppingLists()
+	if dbError(w, err) {
+		return
+	}
+	categories, err := h.db.GetCategories()
+	if dbError(w, err) {
+		return
+	}
 	data := map[string]interface{}{
 		"ActiveNav":  "shopping",
 		"Title":      "Shopping Lists",
@@ -25,14 +32,20 @@ func (h *Handler) handleShoppingLists(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleCreateShoppingList(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
-	list := &database.ShoppingList{Name: r.FormValue("name")}
+	name, ok := requiredField(w, r, "name", "Name")
+	if !ok {
+		return
+	}
+	list := &database.ShoppingList{Name: name}
 	if catID := r.FormValue("category_id"); catID != "" {
 		id, _ := strconv.ParseInt(catID, 10, 64)
 		if id > 0 {
 			list.CategoryID = &id
 		}
 	}
-	h.db.CreateShoppingList(list)
+	if dbError(w, h.db.CreateShoppingList(list)) {
+		return
+	}
 	http.Redirect(w, r, redirectURL(r, "/shopping/"+strconv.FormatInt(list.ID, 10)), http.StatusSeeOther)
 }
 
@@ -44,9 +57,18 @@ func (h *Handler) handleShoppingDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sort := r.URL.Query().Get("sort")
-	items, _ := h.db.GetShoppingItems(id, sort)
-	categories, _ := h.db.GetCategories()
-	tags, _ := h.db.GetTags()
+	items, err := h.db.GetShoppingItems(id, sort)
+	if dbError(w, err) {
+		return
+	}
+	categories, err := h.db.GetCategories()
+	if dbError(w, err) {
+		return
+	}
+	tags, err := h.db.GetTags()
+	if dbError(w, err) {
+		return
+	}
 	data := map[string]interface{}{
 		"ActiveNav":  "shopping",
 		"Title":      list.Name,
@@ -62,35 +84,48 @@ func (h *Handler) handleShoppingDetail(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleUpdateShoppingList(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	r.ParseForm()
-	list := &database.ShoppingList{ID: id, Name: r.FormValue("name")}
+	name, ok := requiredField(w, r, "name", "Name")
+	if !ok {
+		return
+	}
+	list := &database.ShoppingList{ID: id, Name: name}
 	if catID := r.FormValue("category_id"); catID != "" {
 		cid, _ := strconv.ParseInt(catID, 10, 64)
 		if cid > 0 {
 			list.CategoryID = &cid
 		}
 	}
-	h.db.UpdateShoppingList(list)
+	if dbError(w, h.db.UpdateShoppingList(list)) {
+		return
+	}
 	http.Redirect(w, r, redirectURL(r, "/shopping/"+strconv.FormatInt(id, 10)), http.StatusSeeOther)
 }
 
 func (h *Handler) handleDeleteShoppingList(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	h.db.DeleteShoppingList(id)
+	if dbError(w, h.db.DeleteShoppingList(id)) {
+		return
+	}
 	http.Redirect(w, r, redirectURL(r, "/shopping"), http.StatusSeeOther)
 }
 
 func (h *Handler) handleCreateShoppingItem(w http.ResponseWriter, r *http.Request) {
 	listID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	r.ParseForm()
-	name := r.FormValue("name")
+	name, ok := requiredField(w, r, "name", "Name")
+	if !ok {
+		return
+	}
 	qty, _ := strconv.Atoi(r.FormValue("quantity"))
 	if qty < 1 {
 		qty = 1
 	}
-	unit := r.FormValue("unit")
+	unit := strings.TrimSpace(r.FormValue("unit"))
 
 	if existing, err := h.db.FindShoppingItemByName(listID, name); err == nil {
-		h.db.ReactivateShoppingItem(existing.ID, qty, unit)
+		if dbError(w, h.db.ReactivateShoppingItem(existing.ID, qty, unit)) {
+			return
+		}
 		h.renderShoppingItems(w, r, listID)
 		return
 	}
@@ -107,7 +142,9 @@ func (h *Handler) handleCreateShoppingItem(w http.ResponseWriter, r *http.Reques
 			item.CategoryID = &cid
 		}
 	}
-	h.db.CreateShoppingItem(item)
+	if dbError(w, h.db.CreateShoppingItem(item)) {
+		return
+	}
 
 	if tagIDs := r.Form["tag_ids"]; len(tagIDs) > 0 {
 		var ids []int64
@@ -115,7 +152,9 @@ func (h *Handler) handleCreateShoppingItem(w http.ResponseWriter, r *http.Reques
 			tid, _ := strconv.ParseInt(t, 10, 64)
 			ids = append(ids, tid)
 		}
-		h.db.SetShoppingItemTags(item.ID, ids)
+		if dbError(w, h.db.SetShoppingItemTags(item.ID, ids)) {
+			return
+		}
 	}
 
 	h.renderShoppingItems(w, r, listID)
@@ -128,8 +167,14 @@ func (h *Handler) handleGetShoppingItemEdit(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "Item not found", http.StatusNotFound)
 		return
 	}
-	categories, _ := h.db.GetCategories()
-	tags, _ := h.db.GetTags()
+	categories, err := h.db.GetCategories()
+	if dbError(w, err) {
+		return
+	}
+	tags, err := h.db.GetTags()
+	if dbError(w, err) {
+		return
+	}
 	var itemTagIDs []int64
 	for _, t := range item.Tags {
 		itemTagIDs = append(itemTagIDs, t.ID)
@@ -152,13 +197,17 @@ func (h *Handler) handleUpdateShoppingItem(w http.ResponseWriter, r *http.Reques
 	}
 
 	r.ParseForm()
-	item.Name = r.FormValue("name")
+	name, ok := requiredField(w, r, "name", "Name")
+	if !ok {
+		return
+	}
+	item.Name = name
 	qty, _ := strconv.Atoi(r.FormValue("quantity"))
 	if qty < 1 {
 		qty = 1
 	}
 	item.Quantity = qty
-	item.Unit = r.FormValue("unit")
+	item.Unit = strings.TrimSpace(r.FormValue("unit"))
 	if catID := r.FormValue("category_id"); catID != "" {
 		cid, _ := strconv.ParseInt(catID, 10, 64)
 		if cid > 0 {
@@ -169,14 +218,18 @@ func (h *Handler) handleUpdateShoppingItem(w http.ResponseWriter, r *http.Reques
 	} else {
 		item.CategoryID = nil
 	}
-	h.db.UpdateShoppingItem(item)
+	if dbError(w, h.db.UpdateShoppingItem(item)) {
+		return
+	}
 
 	var tagIDs []int64
 	for _, t := range r.Form["tag_ids"] {
 		tid, _ := strconv.ParseInt(t, 10, 64)
 		tagIDs = append(tagIDs, tid)
 	}
-	h.db.SetShoppingItemTags(item.ID, tagIDs)
+	if dbError(w, h.db.SetShoppingItemTags(item.ID, tagIDs)) {
+		return
+	}
 
 	h.renderShoppingItems(w, r, item.ListID)
 }
@@ -188,7 +241,9 @@ func (h *Handler) handleDeleteShoppingItem(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "Item not found", http.StatusNotFound)
 		return
 	}
-	h.db.DeleteShoppingItem(itemID)
+	if dbError(w, h.db.DeleteShoppingItem(itemID)) {
+		return
+	}
 	h.renderShoppingItems(w, r, item.ListID)
 }
 
@@ -199,20 +254,28 @@ func (h *Handler) handleToggleShoppingItem(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "Item not found", http.StatusNotFound)
 		return
 	}
-	h.db.ToggleShoppingItem(itemID)
+	if dbError(w, h.db.ToggleShoppingItem(itemID)) {
+		return
+	}
 	h.renderShoppingItems(w, r, item.ListID)
 }
 
 func (h *Handler) handleSetShoppingItemTags(w http.ResponseWriter, r *http.Request) {
 	itemID, _ := strconv.ParseInt(chi.URLParam(r, "itemID"), 10, 64)
+	item, err := h.db.GetShoppingItem(itemID)
+	if err != nil {
+		http.Error(w, "Item not found", http.StatusNotFound)
+		return
+	}
 	r.ParseForm()
 	var tagIDs []int64
 	for _, t := range r.Form["tag_ids"] {
 		tid, _ := strconv.ParseInt(t, 10, 64)
 		tagIDs = append(tagIDs, tid)
 	}
-	h.db.SetShoppingItemTags(itemID, tagIDs)
-	item, _ := h.db.GetShoppingItem(itemID)
+	if dbError(w, h.db.SetShoppingItemTags(itemID, tagIDs)) {
+		return
+	}
 	h.renderShoppingItems(w, r, item.ListID)
 }
 
@@ -221,8 +284,13 @@ func (h *Handler) handleReorderShoppingItems(w http.ResponseWriter, r *http.Requ
 	var body struct {
 		ItemIDs []int64 `json:"item_ids"`
 	}
-	json.NewDecoder(r.Body).Decode(&body)
-	h.db.ReorderShoppingItems(listID, body.ItemIDs)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if dbError(w, h.db.ReorderShoppingItems(listID, body.ItemIDs)) {
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -232,7 +300,10 @@ func (h *Handler) handleSearchShoppingHistory(w http.ResponseWriter, r *http.Req
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	results, _ := h.db.SearchShoppingHistory(q)
+	results, err := h.db.SearchShoppingHistory(q)
+	if dbError(w, err) {
+		return
+	}
 	h.renderPartial(w, "shopping-history-results", results)
 }
 
@@ -245,8 +316,14 @@ func (h *Handler) renderShoppingItems(w http.ResponseWriter, r *http.Request, li
 			}
 		}
 	}
-	items, _ := h.db.GetShoppingItems(listID, sort)
-	tags, _ := h.db.GetTags()
+	items, err := h.db.GetShoppingItems(listID, sort)
+	if dbError(w, err) {
+		return
+	}
+	tags, err := h.db.GetTags()
+	if dbError(w, err) {
+		return
+	}
 	h.renderPartial(w, "shopping-items-list", map[string]interface{}{
 		"Items": items,
 		"Tags":  tags,

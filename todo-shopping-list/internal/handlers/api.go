@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"todo-app/internal/database"
 
@@ -18,6 +20,33 @@ func jsonResponse(w http.ResponseWriter, data interface{}, status int) {
 
 func jsonError(w http.ResponseWriter, msg string, status int) {
 	jsonResponse(w, map[string]string{"error": msg}, status)
+}
+
+// jsonPatch holds a decoded JSON object so updates can apply only the fields the
+// client actually sent, leaving omitted columns untouched.
+type jsonPatch struct {
+	fields map[string]json.RawMessage
+	err    error
+}
+
+func decodePatch(r *http.Request) (*jsonPatch, error) {
+	var fields map[string]json.RawMessage
+	if err := json.NewDecoder(r.Body).Decode(&fields); err != nil {
+		return nil, err
+	}
+	return &jsonPatch{fields: fields}, nil
+}
+
+// apply writes the field into dst if it was present in the request body.
+// A JSON null clears a pointer destination, so nullable columns stay settable.
+func (p *jsonPatch) apply(key string, dst interface{}) {
+	raw, ok := p.fields[key]
+	if !ok || p.err != nil {
+		return
+	}
+	if err := json.Unmarshal(raw, dst); err != nil {
+		p.err = fmt.Errorf("invalid value for %q", key)
+	}
 }
 
 // --- Todo Lists ---
@@ -40,6 +69,7 @@ func (h *Handler) apiCreateTodoList(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+	list.Name = strings.TrimSpace(list.Name)
 	if list.Name == "" {
 		jsonError(w, "Name is required", http.StatusBadRequest)
 		return
@@ -63,17 +93,37 @@ func (h *Handler) apiGetTodoList(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) apiUpdateTodoList(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	var list database.TodoList
-	if err := json.NewDecoder(r.Body).Decode(&list); err != nil {
+	patch, err := decodePatch(r)
+	if err != nil {
 		jsonError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	list.ID = id
-	if err := h.db.UpdateTodoList(&list); err != nil {
+	list, err := h.db.GetTodoList(id)
+	if err != nil {
+		jsonError(w, "Not found", http.StatusNotFound)
+		return
+	}
+	patch.apply("name", &list.Name)
+	patch.apply("category_id", &list.CategoryID)
+	if patch.err != nil {
+		jsonError(w, patch.err.Error(), http.StatusBadRequest)
+		return
+	}
+	list.Name = strings.TrimSpace(list.Name)
+	if list.Name == "" {
+		jsonError(w, "Name is required", http.StatusBadRequest)
+		return
+	}
+	if err := h.db.UpdateTodoList(list); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	jsonResponse(w, list, http.StatusOK)
+	updated, err := h.db.GetTodoList(id)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, updated, http.StatusOK)
 }
 
 func (h *Handler) apiDeleteTodoList(w http.ResponseWriter, r *http.Request) {
@@ -106,6 +156,7 @@ func (h *Handler) apiCreateTodoItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	item.ListID = listID
+	item.Title = strings.TrimSpace(item.Title)
 	if item.Title == "" {
 		jsonError(w, "Title is required", http.StatusBadRequest)
 		return
@@ -129,25 +180,43 @@ func (h *Handler) apiGetTodoItem(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) apiUpdateTodoItem(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	var item database.TodoItem
-	if err := json.NewDecoder(r.Body).Decode(&item); err != nil {
+	patch, err := decodePatch(r)
+	if err != nil {
 		jsonError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	item.ID = id
-
-	existing, err := h.db.GetTodoItem(id)
+	item, err := h.db.GetTodoItem(id)
 	if err != nil {
 		jsonError(w, "Not found", http.StatusNotFound)
 		return
 	}
-	item.ListID = existing.ListID
+	patch.apply("title", &item.Title)
+	patch.apply("description", &item.Description)
+	patch.apply("completed", &item.Completed)
+	patch.apply("deadline", &item.Deadline)
+	patch.apply("date_start", &item.DateStart)
+	patch.apply("date_end", &item.DateEnd)
+	patch.apply("sort_order", &item.SortOrder)
+	if patch.err != nil {
+		jsonError(w, patch.err.Error(), http.StatusBadRequest)
+		return
+	}
+	item.Title = strings.TrimSpace(item.Title)
+	if item.Title == "" {
+		jsonError(w, "Title is required", http.StatusBadRequest)
+		return
+	}
 
-	if err := h.db.UpdateTodoItem(&item); err != nil {
+	if err := h.db.UpdateTodoItem(item); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	jsonResponse(w, item, http.StatusOK)
+	updated, err := h.db.GetTodoItem(id)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, updated, http.StatusOK)
 }
 
 func (h *Handler) apiDeleteTodoItem(w http.ResponseWriter, r *http.Request) {
@@ -179,6 +248,7 @@ func (h *Handler) apiCreateShoppingList(w http.ResponseWriter, r *http.Request) 
 		jsonError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+	list.Name = strings.TrimSpace(list.Name)
 	if list.Name == "" {
 		jsonError(w, "Name is required", http.StatusBadRequest)
 		return
@@ -202,17 +272,37 @@ func (h *Handler) apiGetShoppingList(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) apiUpdateShoppingList(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	var list database.ShoppingList
-	if err := json.NewDecoder(r.Body).Decode(&list); err != nil {
+	patch, err := decodePatch(r)
+	if err != nil {
 		jsonError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	list.ID = id
-	if err := h.db.UpdateShoppingList(&list); err != nil {
+	list, err := h.db.GetShoppingList(id)
+	if err != nil {
+		jsonError(w, "Not found", http.StatusNotFound)
+		return
+	}
+	patch.apply("name", &list.Name)
+	patch.apply("category_id", &list.CategoryID)
+	if patch.err != nil {
+		jsonError(w, patch.err.Error(), http.StatusBadRequest)
+		return
+	}
+	list.Name = strings.TrimSpace(list.Name)
+	if list.Name == "" {
+		jsonError(w, "Name is required", http.StatusBadRequest)
+		return
+	}
+	if err := h.db.UpdateShoppingList(list); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	jsonResponse(w, list, http.StatusOK)
+	updated, err := h.db.GetShoppingList(id)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, updated, http.StatusOK)
 }
 
 func (h *Handler) apiDeleteShoppingList(w http.ResponseWriter, r *http.Request) {
@@ -246,6 +336,7 @@ func (h *Handler) apiCreateShoppingItem(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	item.ListID = listID
+	item.Name = strings.TrimSpace(item.Name)
 	if item.Name == "" {
 		jsonError(w, "Name is required", http.StatusBadRequest)
 		return
@@ -280,25 +371,45 @@ func (h *Handler) apiGetShoppingItem(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) apiUpdateShoppingItem(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	var item database.ShoppingItem
-	if err := json.NewDecoder(r.Body).Decode(&item); err != nil {
+	patch, err := decodePatch(r)
+	if err != nil {
 		jsonError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	item.ID = id
-
-	existing, err := h.db.GetShoppingItem(id)
+	item, err := h.db.GetShoppingItem(id)
 	if err != nil {
 		jsonError(w, "Not found", http.StatusNotFound)
 		return
 	}
-	item.ListID = existing.ListID
+	patch.apply("name", &item.Name)
+	patch.apply("quantity", &item.Quantity)
+	patch.apply("unit", &item.Unit)
+	patch.apply("purchased", &item.Purchased)
+	patch.apply("category_id", &item.CategoryID)
+	patch.apply("sort_order", &item.SortOrder)
+	if patch.err != nil {
+		jsonError(w, patch.err.Error(), http.StatusBadRequest)
+		return
+	}
+	item.Name = strings.TrimSpace(item.Name)
+	if item.Name == "" {
+		jsonError(w, "Name is required", http.StatusBadRequest)
+		return
+	}
+	if item.Quantity < 1 {
+		item.Quantity = 1
+	}
 
-	if err := h.db.UpdateShoppingItem(&item); err != nil {
+	if err := h.db.UpdateShoppingItem(item); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	jsonResponse(w, item, http.StatusOK)
+	updated, err := h.db.GetShoppingItem(id)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, updated, http.StatusOK)
 }
 
 func (h *Handler) apiDeleteShoppingItem(w http.ResponseWriter, r *http.Request) {
@@ -343,6 +454,7 @@ func (h *Handler) apiCreateCategory(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+	cat.Name = strings.TrimSpace(cat.Name)
 	if cat.Name == "" {
 		jsonError(w, "Name is required", http.StatusBadRequest)
 		return
@@ -372,13 +484,29 @@ func (h *Handler) apiGetCategory(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) apiUpdateCategory(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	var cat database.Category
-	if err := json.NewDecoder(r.Body).Decode(&cat); err != nil {
+	patch, err := decodePatch(r)
+	if err != nil {
 		jsonError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	cat.ID = id
-	if err := h.db.UpdateCategory(&cat); err != nil {
+	cat, err := h.db.GetCategory(id)
+	if err != nil {
+		jsonError(w, "Not found", http.StatusNotFound)
+		return
+	}
+	patch.apply("name", &cat.Name)
+	patch.apply("color", &cat.Color)
+	patch.apply("icon", &cat.Icon)
+	if patch.err != nil {
+		jsonError(w, patch.err.Error(), http.StatusBadRequest)
+		return
+	}
+	cat.Name = strings.TrimSpace(cat.Name)
+	if cat.Name == "" {
+		jsonError(w, "Name is required", http.StatusBadRequest)
+		return
+	}
+	if err := h.db.UpdateCategory(cat); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -414,6 +542,7 @@ func (h *Handler) apiCreateTag(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+	tag.Name = strings.TrimSpace(tag.Name)
 	if tag.Name == "" {
 		jsonError(w, "Name is required", http.StatusBadRequest)
 		return
@@ -440,13 +569,28 @@ func (h *Handler) apiGetTag(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) apiUpdateTag(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	var tag database.Tag
-	if err := json.NewDecoder(r.Body).Decode(&tag); err != nil {
+	patch, err := decodePatch(r)
+	if err != nil {
 		jsonError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	tag.ID = id
-	if err := h.db.UpdateTag(&tag); err != nil {
+	tag, err := h.db.GetTag(id)
+	if err != nil {
+		jsonError(w, "Not found", http.StatusNotFound)
+		return
+	}
+	patch.apply("name", &tag.Name)
+	patch.apply("color", &tag.Color)
+	if patch.err != nil {
+		jsonError(w, patch.err.Error(), http.StatusBadRequest)
+		return
+	}
+	tag.Name = strings.TrimSpace(tag.Name)
+	if tag.Name == "" {
+		jsonError(w, "Name is required", http.StatusBadRequest)
+		return
+	}
+	if err := h.db.UpdateTag(tag); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

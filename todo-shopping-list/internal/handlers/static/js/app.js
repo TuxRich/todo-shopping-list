@@ -90,41 +90,43 @@ function editShoppingItem(itemId) {
 
 function editCategory(id, name, color, icon) {
     var html = '<h2 class="text-lg font-semibold text-[#CDD6F4] mb-4">Edit Category</h2>' +
-        '<form hx-put="settings/categories/' + id + '" hx-target="#categories-list" hx-swap="innerHTML"' +
+        '<form hx-put="settings/categories/' + encodeURIComponent(id) + '" hx-target="#categories-list" hx-swap="innerHTML"' +
         ' hx-on::after-request="if(event.detail.successful) document.getElementById(\'edit-modal\').classList.add(\'hidden\')">' +
         '<div class="space-y-4">' +
         '<div><label class="block text-sm font-medium text-[#BAC2DE] mb-1">Name</label>' +
-        '<input type="text" name="name" value="' + name + '" required class="w-full rounded-lg border border-[#585B70] bg-[#1E1E2E] px-3 py-2 text-sm text-[#CDD6F4] focus:ring-2 focus:ring-[#89B4FA] focus:border-[#89B4FA] outline-none"></div>' +
+        '<input type="text" name="name" required class="w-full rounded-lg border border-[#585B70] bg-[#1E1E2E] px-3 py-2 text-sm text-[#CDD6F4] focus:ring-2 focus:ring-[#89B4FA] focus:border-[#89B4FA] outline-none"></div>' +
         '<div><label class="block text-sm font-medium text-[#BAC2DE] mb-1">Color</label>' +
-        '<input type="color" name="color" value="' + color + '" class="w-full h-10 rounded-lg border border-[#585B70] bg-[#1E1E2E] cursor-pointer"></div>' +
+        '<input type="color" name="color" class="w-full h-10 rounded-lg border border-[#585B70] bg-[#1E1E2E] cursor-pointer"></div>' +
         '<div><label class="block text-sm font-medium text-[#BAC2DE] mb-1">Icon</label>' +
-        '<input type="text" name="icon" value="' + icon + '" maxlength="4" class="w-20 rounded-lg border border-[#585B70] bg-[#1E1E2E] px-3 py-2 text-sm text-center text-[#CDD6F4] focus:ring-2 focus:ring-[#89B4FA] focus:border-[#89B4FA] outline-none"></div>' +
+        '<input type="text" name="icon" maxlength="4" class="w-20 rounded-lg border border-[#585B70] bg-[#1E1E2E] px-3 py-2 text-sm text-center text-[#CDD6F4] focus:ring-2 focus:ring-[#89B4FA] focus:border-[#89B4FA] outline-none"></div>' +
         '</div>' +
         '<div class="flex justify-end space-x-3 mt-6">' +
         '<button type="button" onclick="document.getElementById(\'edit-modal\').classList.add(\'hidden\')" class="px-4 py-2 text-sm font-medium text-[#BAC2DE] hover:bg-[#45475A] rounded-lg transition-colors">Cancel</button>' +
         '<button type="submit" class="px-4 py-2 text-sm font-medium text-[#11111B] bg-[#89B4FA] hover:bg-[#74C7EC] rounded-lg transition-colors">Save</button>' +
         '</div></form>';
-    showEditModal(html);
+    showEditModal(html, {name: name, color: color, icon: icon});
 }
 
 function editTag(id, name, color) {
     var html = '<h2 class="text-lg font-semibold text-[#CDD6F4] mb-4">Edit Tag</h2>' +
-        '<form hx-put="settings/tags/' + id + '" hx-target="#tags-list" hx-swap="innerHTML"' +
+        '<form hx-put="settings/tags/' + encodeURIComponent(id) + '" hx-target="#tags-list" hx-swap="innerHTML"' +
         ' hx-on::after-request="if(event.detail.successful) document.getElementById(\'edit-modal\').classList.add(\'hidden\')">' +
         '<div class="space-y-4">' +
         '<div><label class="block text-sm font-medium text-[#BAC2DE] mb-1">Name</label>' +
-        '<input type="text" name="name" value="' + name + '" required class="w-full rounded-lg border border-[#585B70] bg-[#1E1E2E] px-3 py-2 text-sm text-[#CDD6F4] focus:ring-2 focus:ring-[#89B4FA] focus:border-[#89B4FA] outline-none"></div>' +
+        '<input type="text" name="name" required class="w-full rounded-lg border border-[#585B70] bg-[#1E1E2E] px-3 py-2 text-sm text-[#CDD6F4] focus:ring-2 focus:ring-[#89B4FA] focus:border-[#89B4FA] outline-none"></div>' +
         '<div><label class="block text-sm font-medium text-[#BAC2DE] mb-1">Color</label>' +
-        '<input type="color" name="color" value="' + color + '" class="w-full h-10 rounded-lg border border-[#585B70] bg-[#1E1E2E] cursor-pointer"></div>' +
+        '<input type="color" name="color" class="w-full h-10 rounded-lg border border-[#585B70] bg-[#1E1E2E] cursor-pointer"></div>' +
         '</div>' +
         '<div class="flex justify-end space-x-3 mt-6">' +
         '<button type="button" onclick="document.getElementById(\'edit-modal\').classList.add(\'hidden\')" class="px-4 py-2 text-sm font-medium text-[#BAC2DE] hover:bg-[#45475A] rounded-lg transition-colors">Cancel</button>' +
         '<button type="submit" class="px-4 py-2 text-sm font-medium text-[#11111B] bg-[#89B4FA] hover:bg-[#74C7EC] rounded-lg transition-colors">Save</button>' +
         '</div></form>';
-    showEditModal(html);
+    showEditModal(html, {name: name, color: color});
 }
 
-function showEditModal(html) {
+// values are assigned through the value property rather than interpolated into
+// the markup, so names containing quotes or tags cannot inject HTML.
+function showEditModal(html, values) {
     var modal = document.getElementById('edit-modal');
     if (!modal) {
         modal = document.createElement('div');
@@ -136,9 +138,16 @@ function showEditModal(html) {
         });
         document.body.appendChild(modal);
     }
-    document.getElementById('edit-modal-content').innerHTML = html;
+    var content = document.getElementById('edit-modal-content');
+    content.innerHTML = html;
+    if (values) {
+        Object.keys(values).forEach(function(field) {
+            var input = content.querySelector('[name="' + field + '"]');
+            if (input) input.value = values[field];
+        });
+    }
     modal.classList.remove('hidden');
-    htmx.process(document.getElementById('edit-modal-content'));
+    htmx.process(content);
 }
 
 (function() {

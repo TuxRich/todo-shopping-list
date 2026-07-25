@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"todo-app/internal/database"
 
@@ -10,8 +11,14 @@ import (
 )
 
 func (h *Handler) handleSettings(w http.ResponseWriter, r *http.Request) {
-	categories, _ := h.db.GetCategories()
-	tags, _ := h.db.GetTags()
+	categories, err := h.db.GetCategories()
+	if dbError(w, err) {
+		return
+	}
+	tags, err := h.db.GetTags()
+	if dbError(w, err) {
+		return
+	}
 	data := map[string]interface{}{
 		"ActiveNav":  "settings",
 		"Title":      "Settings",
@@ -23,10 +30,14 @@ func (h *Handler) handleSettings(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
+	name, ok := requiredField(w, r, "name", "Name")
+	if !ok {
+		return
+	}
 	cat := &database.Category{
-		Name:  r.FormValue("name"),
+		Name:  name,
 		Color: r.FormValue("color"),
-		Icon:  r.FormValue("icon"),
+		Icon:  strings.TrimSpace(r.FormValue("icon")),
 	}
 	if cat.Color == "" {
 		cat.Color = "#6366f1"
@@ -34,62 +45,105 @@ func (h *Handler) handleCreateCategory(w http.ResponseWriter, r *http.Request) {
 	if cat.Icon == "" {
 		cat.Icon = "📁"
 	}
-	h.db.CreateCategory(cat)
-	categories, _ := h.db.GetCategories()
-	h.renderPartial(w, "categories-list", categories)
+	if dbError(w, h.db.CreateCategory(cat)) {
+		return
+	}
+	h.renderCategories(w)
 }
 
 func (h *Handler) handleUpdateCategory(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	r.ParseForm()
+	name, ok := requiredField(w, r, "name", "Name")
+	if !ok {
+		return
+	}
 	cat := &database.Category{
 		ID:    id,
-		Name:  r.FormValue("name"),
+		Name:  name,
 		Color: r.FormValue("color"),
-		Icon:  r.FormValue("icon"),
+		Icon:  strings.TrimSpace(r.FormValue("icon")),
 	}
-	h.db.UpdateCategory(cat)
-	categories, _ := h.db.GetCategories()
-	h.renderPartial(w, "categories-list", categories)
+	if cat.Color == "" {
+		cat.Color = "#6366f1"
+	}
+	if cat.Icon == "" {
+		cat.Icon = "📁"
+	}
+	if dbError(w, h.db.UpdateCategory(cat)) {
+		return
+	}
+	h.renderCategories(w)
 }
 
 func (h *Handler) handleDeleteCategory(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	h.db.DeleteCategory(id)
-	categories, _ := h.db.GetCategories()
-	h.renderPartial(w, "categories-list", categories)
+	if dbError(w, h.db.DeleteCategory(id)) {
+		return
+	}
+	h.renderCategories(w)
 }
 
 func (h *Handler) handleCreateTag(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
+	name, ok := requiredField(w, r, "name", "Name")
+	if !ok {
+		return
+	}
 	tag := &database.Tag{
-		Name:  r.FormValue("name"),
+		Name:  name,
 		Color: r.FormValue("color"),
 	}
 	if tag.Color == "" {
 		tag.Color = "#8b5cf6"
 	}
-	h.db.CreateTag(tag)
-	tags, _ := h.db.GetTags()
-	h.renderPartial(w, "tags-list", tags)
+	if dbError(w, h.db.CreateTag(tag)) {
+		return
+	}
+	h.renderTags(w)
 }
 
 func (h *Handler) handleUpdateTag(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	r.ParseForm()
+	name, ok := requiredField(w, r, "name", "Name")
+	if !ok {
+		return
+	}
 	tag := &database.Tag{
 		ID:    id,
-		Name:  r.FormValue("name"),
+		Name:  name,
 		Color: r.FormValue("color"),
 	}
-	h.db.UpdateTag(tag)
-	tags, _ := h.db.GetTags()
-	h.renderPartial(w, "tags-list", tags)
+	if tag.Color == "" {
+		tag.Color = "#8b5cf6"
+	}
+	if dbError(w, h.db.UpdateTag(tag)) {
+		return
+	}
+	h.renderTags(w)
 }
 
 func (h *Handler) handleDeleteTag(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	h.db.DeleteTag(id)
-	tags, _ := h.db.GetTags()
+	if dbError(w, h.db.DeleteTag(id)) {
+		return
+	}
+	h.renderTags(w)
+}
+
+func (h *Handler) renderCategories(w http.ResponseWriter) {
+	categories, err := h.db.GetCategories()
+	if dbError(w, err) {
+		return
+	}
+	h.renderPartial(w, "categories-list", categories)
+}
+
+func (h *Handler) renderTags(w http.ResponseWriter) {
+	tags, err := h.db.GetTags()
+	if dbError(w, err) {
+		return
+	}
 	h.renderPartial(w, "tags-list", tags)
 }

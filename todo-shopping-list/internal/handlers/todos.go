@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"todo-app/internal/database"
 
@@ -11,8 +12,14 @@ import (
 )
 
 func (h *Handler) handleIndex(w http.ResponseWriter, r *http.Request) {
-	todoLists, _ := h.db.GetTodoLists()
-	shoppingLists, _ := h.db.GetShoppingLists()
+	todoLists, err := h.db.GetTodoLists()
+	if dbError(w, err) {
+		return
+	}
+	shoppingLists, err := h.db.GetShoppingLists()
+	if dbError(w, err) {
+		return
+	}
 
 	data := map[string]interface{}{
 		"ActiveNav":      "home",
@@ -39,8 +46,14 @@ func limitShoppingLists(lists []database.ShoppingList, n int) []database.Shoppin
 }
 
 func (h *Handler) handleTodoLists(w http.ResponseWriter, r *http.Request) {
-	lists, _ := h.db.GetTodoLists()
-	categories, _ := h.db.GetCategories()
+	lists, err := h.db.GetTodoLists()
+	if dbError(w, err) {
+		return
+	}
+	categories, err := h.db.GetCategories()
+	if dbError(w, err) {
+		return
+	}
 	data := map[string]interface{}{
 		"ActiveNav":  "todos",
 		"Title":      "Todo Lists",
@@ -52,14 +65,20 @@ func (h *Handler) handleTodoLists(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleCreateTodoList(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
-	list := &database.TodoList{Name: r.FormValue("name")}
+	name, ok := requiredField(w, r, "name", "Name")
+	if !ok {
+		return
+	}
+	list := &database.TodoList{Name: name}
 	if catID := r.FormValue("category_id"); catID != "" {
 		id, _ := strconv.ParseInt(catID, 10, 64)
 		if id > 0 {
 			list.CategoryID = &id
 		}
 	}
-	h.db.CreateTodoList(list)
+	if dbError(w, h.db.CreateTodoList(list)) {
+		return
+	}
 	http.Redirect(w, r, redirectURL(r, "/todos/"+strconv.FormatInt(list.ID, 10)), http.StatusSeeOther)
 }
 
@@ -70,9 +89,18 @@ func (h *Handler) handleTodoDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "List not found", http.StatusNotFound)
 		return
 	}
-	items, _ := h.db.GetTodoItems(id)
-	categories, _ := h.db.GetCategories()
-	tags, _ := h.db.GetTags()
+	items, err := h.db.GetTodoItems(id)
+	if dbError(w, err) {
+		return
+	}
+	categories, err := h.db.GetCategories()
+	if dbError(w, err) {
+		return
+	}
+	tags, err := h.db.GetTags()
+	if dbError(w, err) {
+		return
+	}
 	data := map[string]interface{}{
 		"ActiveNav":  "todos",
 		"Title":      list.Name,
@@ -87,29 +115,41 @@ func (h *Handler) handleTodoDetail(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleUpdateTodoList(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	r.ParseForm()
-	list := &database.TodoList{ID: id, Name: r.FormValue("name")}
+	name, ok := requiredField(w, r, "name", "Name")
+	if !ok {
+		return
+	}
+	list := &database.TodoList{ID: id, Name: name}
 	if catID := r.FormValue("category_id"); catID != "" {
 		cid, _ := strconv.ParseInt(catID, 10, 64)
 		if cid > 0 {
 			list.CategoryID = &cid
 		}
 	}
-	h.db.UpdateTodoList(list)
+	if dbError(w, h.db.UpdateTodoList(list)) {
+		return
+	}
 	http.Redirect(w, r, redirectURL(r, "/todos/"+strconv.FormatInt(id, 10)), http.StatusSeeOther)
 }
 
 func (h *Handler) handleDeleteTodoList(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	h.db.DeleteTodoList(id)
+	if dbError(w, h.db.DeleteTodoList(id)) {
+		return
+	}
 	http.Redirect(w, r, redirectURL(r, "/todos"), http.StatusSeeOther)
 }
 
 func (h *Handler) handleCreateTodoItem(w http.ResponseWriter, r *http.Request) {
 	listID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	r.ParseForm()
+	title, ok := requiredField(w, r, "title", "Title")
+	if !ok {
+		return
+	}
 	item := &database.TodoItem{
 		ListID: listID,
-		Title:  r.FormValue("title"),
+		Title:  title,
 	}
 	if d := r.FormValue("deadline"); d != "" {
 		item.Deadline = &d
@@ -120,7 +160,9 @@ func (h *Handler) handleCreateTodoItem(w http.ResponseWriter, r *http.Request) {
 	if de := r.FormValue("date_end"); de != "" {
 		item.DateEnd = &de
 	}
-	h.db.CreateTodoItem(item)
+	if dbError(w, h.db.CreateTodoItem(item)) {
+		return
+	}
 
 	if tagIDs := r.Form["tag_ids"]; len(tagIDs) > 0 {
 		var ids []int64
@@ -128,7 +170,9 @@ func (h *Handler) handleCreateTodoItem(w http.ResponseWriter, r *http.Request) {
 			tid, _ := strconv.ParseInt(t, 10, 64)
 			ids = append(ids, tid)
 		}
-		h.db.SetTodoItemTags(item.ID, ids)
+		if dbError(w, h.db.SetTodoItemTags(item.ID, ids)) {
+			return
+		}
 	}
 
 	h.renderTodoItems(w, listID)
@@ -144,8 +188,12 @@ func (h *Handler) handleUpdateTodoItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	item.Title = r.FormValue("title")
-	item.Description = r.FormValue("description")
+	title, ok := requiredField(w, r, "title", "Title")
+	if !ok {
+		return
+	}
+	item.Title = title
+	item.Description = strings.TrimSpace(r.FormValue("description"))
 	if d := r.FormValue("deadline"); d != "" {
 		item.Deadline = &d
 	} else {
@@ -161,14 +209,18 @@ func (h *Handler) handleUpdateTodoItem(w http.ResponseWriter, r *http.Request) {
 	} else {
 		item.DateEnd = nil
 	}
-	h.db.UpdateTodoItem(item)
+	if dbError(w, h.db.UpdateTodoItem(item)) {
+		return
+	}
 
 	var tagIDs []int64
 	for _, t := range r.Form["tag_ids"] {
 		tid, _ := strconv.ParseInt(t, 10, 64)
 		tagIDs = append(tagIDs, tid)
 	}
-	h.db.SetTodoItemTags(item.ID, tagIDs)
+	if dbError(w, h.db.SetTodoItemTags(item.ID, tagIDs)) {
+		return
+	}
 
 	h.renderTodoItems(w, item.ListID)
 }
@@ -180,7 +232,9 @@ func (h *Handler) handleDeleteTodoItem(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Item not found", http.StatusNotFound)
 		return
 	}
-	h.db.DeleteTodoItem(itemID)
+	if dbError(w, h.db.DeleteTodoItem(itemID)) {
+		return
+	}
 	h.renderTodoItems(w, item.ListID)
 }
 
@@ -191,20 +245,28 @@ func (h *Handler) handleToggleTodoItem(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Item not found", http.StatusNotFound)
 		return
 	}
-	h.db.ToggleTodoItem(itemID)
+	if dbError(w, h.db.ToggleTodoItem(itemID)) {
+		return
+	}
 	h.renderTodoItems(w, item.ListID)
 }
 
 func (h *Handler) handleSetTodoItemTags(w http.ResponseWriter, r *http.Request) {
 	itemID, _ := strconv.ParseInt(chi.URLParam(r, "itemID"), 10, 64)
+	item, err := h.db.GetTodoItem(itemID)
+	if err != nil {
+		http.Error(w, "Item not found", http.StatusNotFound)
+		return
+	}
 	r.ParseForm()
 	var tagIDs []int64
 	for _, t := range r.Form["tag_ids"] {
 		tid, _ := strconv.ParseInt(t, 10, 64)
 		tagIDs = append(tagIDs, tid)
 	}
-	h.db.SetTodoItemTags(itemID, tagIDs)
-	item, _ := h.db.GetTodoItem(itemID)
+	if dbError(w, h.db.SetTodoItemTags(itemID, tagIDs)) {
+		return
+	}
 	h.renderTodoItems(w, item.ListID)
 }
 
@@ -213,14 +275,25 @@ func (h *Handler) handleReorderTodoItems(w http.ResponseWriter, r *http.Request)
 	var body struct {
 		ItemIDs []int64 `json:"item_ids"`
 	}
-	json.NewDecoder(r.Body).Decode(&body)
-	h.db.ReorderTodoItems(listID, body.ItemIDs)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if dbError(w, h.db.ReorderTodoItems(listID, body.ItemIDs)) {
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
 func (h *Handler) renderTodoItems(w http.ResponseWriter, listID int64) {
-	items, _ := h.db.GetTodoItems(listID)
-	tags, _ := h.db.GetTags()
+	items, err := h.db.GetTodoItems(listID)
+	if dbError(w, err) {
+		return
+	}
+	tags, err := h.db.GetTags()
+	if dbError(w, err) {
+		return
+	}
 	h.renderPartial(w, "todo-items-list", map[string]interface{}{
 		"Items": items,
 		"Tags":  tags,
@@ -234,7 +307,10 @@ func (h *Handler) handleGetTodoItemEdit(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Item not found", http.StatusNotFound)
 		return
 	}
-	tags, _ := h.db.GetTags()
+	tags, err := h.db.GetTags()
+	if dbError(w, err) {
+		return
+	}
 	var itemTagIDs []int64
 	for _, t := range item.Tags {
 		itemTagIDs = append(itemTagIDs, t.ID)

@@ -219,14 +219,28 @@ func (db *DB) FindShoppingItemByName(listID int64, name string) (*ShoppingItem, 
 	return &item, nil
 }
 
+// ReactivateShoppingItem un-purchases an item that is already on the list and
+// applies the new quantity. A blank unit keeps the stored one, so re-adding an
+// item from the quick-add form (which has no unit filled in) does not wipe it.
 func (db *DB) ReactivateShoppingItem(id int64, quantity int, unit string) error {
-	now := time.Now()
-	_, err := db.conn.Exec(`
-		UPDATE shopping_items SET purchased = 0, quantity = ?, unit = ?, updated_at = ? WHERE id = ?`,
-		quantity, unit, now, id)
+	item, err := db.GetShoppingItem(id)
 	if err != nil {
+		return fmt.Errorf("reactivate shopping item %d: %w", id, err)
+	}
+	if unit == "" {
+		unit = item.Unit
+	}
+
+	now := time.Now()
+	if _, err := db.conn.Exec(`
+		UPDATE shopping_items SET purchased = 0, quantity = ?, unit = ?, updated_at = ? WHERE id = ?`,
+		quantity, unit, now, id); err != nil {
 		return fmt.Errorf("reactivate shopping item: %w", err)
 	}
+
+	db.conn.Exec("UPDATE shopping_lists SET updated_at = ? WHERE id = ?", now, item.ListID)
+
+	db.recordShoppingHistory(item.Name, unit, quantity, item.CategoryID)
 	return nil
 }
 
