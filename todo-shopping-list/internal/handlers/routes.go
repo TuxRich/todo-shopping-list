@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"html/template"
 	"io/fs"
 	"log"
@@ -28,9 +30,10 @@ var templateFS embed.FS
 var staticFS embed.FS
 
 type Handler struct {
-	db    *database.DB
-	pages map[string]*template.Template
-	parts *template.Template
+	db           *database.DB
+	pages        map[string]*template.Template
+	parts        *template.Template
+	assetVersion string
 }
 
 func NewRouter(db *database.DB) http.Handler {
@@ -92,7 +95,8 @@ func NewRouter(db *database.DB) http.Handler {
 		pages[pf] = pt
 	}
 
-	h := &Handler{db: db, pages: pages, parts: base}
+	staticContent, _ := fs.Sub(staticFS, "static")
+	h := &Handler{db: db, pages: pages, parts: base, assetVersion: assetVersion(staticContent)}
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -100,7 +104,6 @@ func NewRouter(db *database.DB) http.Handler {
 	r.Use(middleware.Compress(5))
 	r.Use(ingressMiddleware)
 
-	staticContent, _ := fs.Sub(staticFS, "static")
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(staticContent))))
 
 	r.Get("/", h.handleIndex)
@@ -196,6 +199,28 @@ func NewRouter(db *database.DB) http.Handler {
 	return r
 }
 
+// assetVersion hashes the embedded static files. Pages link to them as
+// static/js/app.js?v=<hash>, so each release gets new URLs and a browser, or a
+// caching proxy in front of Home Assistant, cannot keep serving the previous
+// version's scripts after an update. The server sends no cache headers, so
+// without this nothing forces a stale copy to be refetched.
+func assetVersion(fsys fs.FS) string {
+	h := sha256.New()
+	fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		b, err := fs.ReadFile(fsys, path)
+		if err != nil {
+			return err
+		}
+		h.Write([]byte(path))
+		h.Write(b)
+		return nil
+	})
+	return hex.EncodeToString(h.Sum(nil))[:12]
+}
+
 func ingressMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ingressPath := r.Header.Get("X-Ingress-Path")
@@ -277,6 +302,7 @@ func (h *Handler) render(w http.ResponseWriter, r *http.Request, page string, da
 		basePath += "/"
 	}
 	data["BasePath"] = basePath
+	data["AssetVersion"] = h.assetVersion
 
 	tmpl, ok := h.pages[page]
 	if !ok {

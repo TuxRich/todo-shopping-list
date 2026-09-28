@@ -34,6 +34,11 @@ function initTodoBoard() {
             draggable: '.board-card',
             filter: 'button',
             preventOnFilter: false,
+            // On touch screens, a short press-and-hold picks a card up, so a
+            // plain swipe over the stacked columns still scrolls the page.
+            delay: 150,
+            delayOnTouchOnly: true,
+            touchStartThreshold: 5,
             animation: 150,
             ghostClass: 'sortable-ghost',
             chosenClass: 'sortable-chosen',

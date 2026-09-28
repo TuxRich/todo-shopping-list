@@ -9,7 +9,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-    <link rel="stylesheet" href="static/css/style.css">
+    <link rel="stylesheet" href="static/css/style.css?v={{.AssetVersion}}">
     <script>
         tailwind.config = {
             theme: {
@@ -78,7 +78,7 @@
         </main>
     </div>
 
-    <script src="static/js/app.js"></script>
+    <script src="static/js/app.js?v={{.AssetVersion}}"></script>
 </body>
 </html>
 {{end}}

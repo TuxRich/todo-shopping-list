@@ -1,3 +1,8 @@
+## 1.2.1
+
+- Fixed dragging on the board selecting text instead of moving the card: after an update, a browser or a caching proxy in front of Home Assistant could keep using the previous version's scripts. Script and style links now change with every release, so the current version is always loaded
+- Board cards can no longer be text-selected, and on touch screens a short press-and-hold picks a card up while a quick swipe still scrolls the page
+
 ## 1.2.0
 
 - Tasks can now be marked To do, In progress, or Done; the list view shows an "In progress" badge and has a start/pause button on each task

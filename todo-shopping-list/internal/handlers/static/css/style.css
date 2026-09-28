@@ -41,3 +41,12 @@ select option {
     background-color: #1E1E2E;
     color: #CDD6F4;
 }
+
+/* Board cards are dragged, not read and copied: stop a press-and-hold on a
+   touch screen from selecting text or opening the callout menu, which would
+   otherwise win over the drag. */
+.board-card {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
