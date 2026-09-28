@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -196,6 +197,9 @@ func (db *DB) GetShoppingItem(id int64) (*ShoppingItem, error) {
 	return &item, nil
 }
 
+// FindShoppingItemByName looks up an item on the list by case-insensitive
+// name. It returns nil, nil when there is no match, so callers can tell "not
+// on the list" apart from a database failure.
 func (db *DB) FindShoppingItemByName(listID int64, name string) (*ShoppingItem, error) {
 	var item ShoppingItem
 	var catIDInt sql.NullInt64
@@ -210,8 +214,11 @@ func (db *DB) FindShoppingItemByName(listID int64, name string) (*ShoppingItem, 
 		Scan(&item.ID, &item.ListID, &item.Name, &item.Quantity, &item.Unit,
 			&item.Purchased, &item.CategoryID, &item.SortOrder, &item.CreatedAt, &item.UpdatedAt,
 			&catIDInt, &catName, &catColor, &catIcon)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("find shopping item: %w", err)
 	}
 	if catIDInt.Valid {
 		item.Category = &Category{ID: catIDInt.Int64, Name: catName.String, Color: catColor.String, Icon: catIcon.String}
@@ -245,11 +252,36 @@ func (db *DB) ReactivateShoppingItem(id int64, quantity int, unit string) error 
 }
 
 func (db *DB) CreateShoppingItem(item *ShoppingItem) error {
+	if err := createShoppingItem(db.conn, item); err != nil {
+		return err
+	}
+	db.recordShoppingHistory(item.Name, item.Unit, item.Quantity, item.CategoryID)
+	return nil
+}
+
+// CreateShoppingItemWithTags inserts the item and its tags in one transaction,
+// so a failed tag write cannot leave an untagged item behind. History is
+// best-effort and recorded only after the commit, outside the transaction.
+func (db *DB) CreateShoppingItemWithTags(item *ShoppingItem, tagIDs []int64) error {
+	err := db.inTx(func(tx *sql.Tx) error {
+		if err := createShoppingItem(tx, item); err != nil {
+			return err
+		}
+		return setShoppingItemTags(tx, item.ID, tagIDs)
+	})
+	if err != nil {
+		return err
+	}
+	db.recordShoppingHistory(item.Name, item.Unit, item.Quantity, item.CategoryID)
+	return nil
+}
+
+func createShoppingItem(q querier, item *ShoppingItem) error {
 	now := time.Now()
 	var maxOrder int
-	db.conn.QueryRow("SELECT COALESCE(MAX(sort_order), 0) FROM shopping_items WHERE list_id = ?", item.ListID).Scan(&maxOrder)
+	q.QueryRow("SELECT COALESCE(MAX(sort_order), 0) FROM shopping_items WHERE list_id = ?", item.ListID).Scan(&maxOrder)
 
-	res, err := db.conn.Exec(`
+	res, err := q.Exec(`
 		INSERT INTO shopping_items (list_id, name, quantity, unit, purchased, category_id, sort_order, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		item.ListID, item.Name, item.Quantity, item.Unit, item.Purchased,
@@ -262,15 +294,28 @@ func (db *DB) CreateShoppingItem(item *ShoppingItem) error {
 	item.CreatedAt = now
 	item.UpdatedAt = now
 
-	db.conn.Exec("UPDATE shopping_lists SET updated_at = ? WHERE id = ?", now, item.ListID)
-
-	db.recordShoppingHistory(item.Name, item.Unit, item.Quantity, item.CategoryID)
+	q.Exec("UPDATE shopping_lists SET updated_at = ? WHERE id = ?", now, item.ListID)
 	return nil
 }
 
 func (db *DB) UpdateShoppingItem(item *ShoppingItem) error {
+	return updateShoppingItem(db.conn, item)
+}
+
+// UpdateShoppingItemWithTags saves the item and replaces its tags in one
+// transaction, so either both changes land or neither does.
+func (db *DB) UpdateShoppingItemWithTags(item *ShoppingItem, tagIDs []int64) error {
+	return db.inTx(func(tx *sql.Tx) error {
+		if err := updateShoppingItem(tx, item); err != nil {
+			return err
+		}
+		return setShoppingItemTags(tx, item.ID, tagIDs)
+	})
+}
+
+func updateShoppingItem(q querier, item *ShoppingItem) error {
 	now := time.Now()
-	_, err := db.conn.Exec(`
+	_, err := q.Exec(`
 		UPDATE shopping_items SET name = ?, quantity = ?, unit = ?, purchased = ?,
 			category_id = ?, sort_order = ?, updated_at = ?
 		WHERE id = ?`,
@@ -281,16 +326,22 @@ func (db *DB) UpdateShoppingItem(item *ShoppingItem) error {
 	}
 	item.UpdatedAt = now
 
-	db.conn.Exec("UPDATE shopping_lists SET updated_at = ? WHERE id = ?", now, item.ListID)
+	q.Exec("UPDATE shopping_lists SET updated_at = ? WHERE id = ?", now, item.ListID)
 	return nil
 }
 
+// ToggleShoppingItem flips the purchased flag and counts as activity on the
+// list. It stamps time.Now() like every other write, rather than SQLite's
+// CURRENT_TIMESTAMP, so updated_at is stored in one consistent format.
 func (db *DB) ToggleShoppingItem(id int64) error {
-	_, err := db.conn.Exec(`
-		UPDATE shopping_items SET purchased = NOT purchased, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, id)
-	if err != nil {
+	now := time.Now()
+	if _, err := db.conn.Exec(`
+		UPDATE shopping_items SET purchased = NOT purchased, updated_at = ? WHERE id = ?`, now, id); err != nil {
 		return fmt.Errorf("toggle shopping item: %w", err)
 	}
+
+	db.conn.Exec(`UPDATE shopping_lists SET updated_at = ?
+		WHERE id = (SELECT list_id FROM shopping_items WHERE id = ?)`, now, id)
 	return nil
 }
 
@@ -303,13 +354,13 @@ func (db *DB) DeleteShoppingItem(id int64) error {
 }
 
 func (db *DB) SetShoppingItemTags(itemID int64, tagIDs []int64) error {
-	tx, err := db.conn.Begin()
-	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
-	}
-	defer tx.Rollback()
+	return db.inTx(func(tx *sql.Tx) error {
+		return setShoppingItemTags(tx, itemID, tagIDs)
+	})
+}
 
-	if _, err := tx.Exec("DELETE FROM shopping_item_tags WHERE shopping_item_id = ?", itemID); err != nil {
+func setShoppingItemTags(q querier, itemID int64, tagIDs []int64) error {
+	if _, err := q.Exec("DELETE FROM shopping_item_tags WHERE shopping_item_id = ?", itemID); err != nil {
 		return fmt.Errorf("clear shopping item tags: %w", err)
 	}
 
@@ -321,12 +372,11 @@ func (db *DB) SetShoppingItemTags(itemID int64, tagIDs []int64) error {
 			args = append(args, itemID, tid)
 		}
 		query := "INSERT INTO shopping_item_tags (shopping_item_id, tag_id) VALUES " + strings.Join(placeholders, ", ")
-		if _, err := tx.Exec(query, args...); err != nil {
+		if _, err := q.Exec(query, args...); err != nil {
 			return fmt.Errorf("insert shopping item tags: %w", err)
 		}
 	}
-
-	return tx.Commit()
+	return nil
 }
 
 func (db *DB) recordShoppingHistory(name, unit string, quantity int, categoryID *int64) {

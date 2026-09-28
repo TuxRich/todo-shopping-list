@@ -175,11 +175,26 @@ func (db *DB) GetTodoItem(id int64) (*TodoItem, error) {
 }
 
 func (db *DB) CreateTodoItem(item *TodoItem) error {
+	return createTodoItem(db.conn, item)
+}
+
+// CreateTodoItemWithTags inserts the item and its tags in one transaction, so
+// a failed tag write cannot leave an untagged item behind.
+func (db *DB) CreateTodoItemWithTags(item *TodoItem, tagIDs []int64) error {
+	return db.inTx(func(tx *sql.Tx) error {
+		if err := createTodoItem(tx, item); err != nil {
+			return err
+		}
+		return setTodoItemTags(tx, item.ID, tagIDs)
+	})
+}
+
+func createTodoItem(q querier, item *TodoItem) error {
 	now := time.Now()
 	var maxOrder int
-	db.conn.QueryRow("SELECT COALESCE(MAX(sort_order), 0) FROM todo_items WHERE list_id = ?", item.ListID).Scan(&maxOrder)
+	q.QueryRow("SELECT COALESCE(MAX(sort_order), 0) FROM todo_items WHERE list_id = ?", item.ListID).Scan(&maxOrder)
 
-	res, err := db.conn.Exec(`
+	res, err := q.Exec(`
 		INSERT INTO todo_items (list_id, title, description, completed, deadline, date_start, date_end, sort_order, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		item.ListID, item.Title, item.Description, item.Completed,
@@ -192,13 +207,28 @@ func (db *DB) CreateTodoItem(item *TodoItem) error {
 	item.CreatedAt = now
 	item.UpdatedAt = now
 
-	db.conn.Exec("UPDATE todo_lists SET updated_at = ? WHERE id = ?", now, item.ListID)
+	q.Exec("UPDATE todo_lists SET updated_at = ? WHERE id = ?", now, item.ListID)
 	return nil
 }
 
 func (db *DB) UpdateTodoItem(item *TodoItem) error {
+	return updateTodoItem(db.conn, item)
+}
+
+// UpdateTodoItemWithTags saves the item and replaces its tags in one
+// transaction, so either both changes land or neither does.
+func (db *DB) UpdateTodoItemWithTags(item *TodoItem, tagIDs []int64) error {
+	return db.inTx(func(tx *sql.Tx) error {
+		if err := updateTodoItem(tx, item); err != nil {
+			return err
+		}
+		return setTodoItemTags(tx, item.ID, tagIDs)
+	})
+}
+
+func updateTodoItem(q querier, item *TodoItem) error {
 	now := time.Now()
-	_, err := db.conn.Exec(`
+	_, err := q.Exec(`
 		UPDATE todo_items SET title = ?, description = ?, completed = ?, deadline = ?,
 			date_start = ?, date_end = ?, sort_order = ?, updated_at = ?
 		WHERE id = ?`,
@@ -210,16 +240,22 @@ func (db *DB) UpdateTodoItem(item *TodoItem) error {
 	}
 	item.UpdatedAt = now
 
-	db.conn.Exec("UPDATE todo_lists SET updated_at = ? WHERE id = ?", now, item.ListID)
+	q.Exec("UPDATE todo_lists SET updated_at = ? WHERE id = ?", now, item.ListID)
 	return nil
 }
 
+// ToggleTodoItem flips the completed flag and counts as activity on the list.
+// It stamps time.Now() like every other write, rather than SQLite's
+// CURRENT_TIMESTAMP, so updated_at is stored in one consistent format.
 func (db *DB) ToggleTodoItem(id int64) error {
-	_, err := db.conn.Exec(`
-		UPDATE todo_items SET completed = NOT completed, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, id)
-	if err != nil {
+	now := time.Now()
+	if _, err := db.conn.Exec(`
+		UPDATE todo_items SET completed = NOT completed, updated_at = ? WHERE id = ?`, now, id); err != nil {
 		return fmt.Errorf("toggle todo item: %w", err)
 	}
+
+	db.conn.Exec(`UPDATE todo_lists SET updated_at = ?
+		WHERE id = (SELECT list_id FROM todo_items WHERE id = ?)`, now, id)
 	return nil
 }
 
@@ -232,13 +268,13 @@ func (db *DB) DeleteTodoItem(id int64) error {
 }
 
 func (db *DB) SetTodoItemTags(itemID int64, tagIDs []int64) error {
-	tx, err := db.conn.Begin()
-	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
-	}
-	defer tx.Rollback()
+	return db.inTx(func(tx *sql.Tx) error {
+		return setTodoItemTags(tx, itemID, tagIDs)
+	})
+}
 
-	if _, err := tx.Exec("DELETE FROM todo_item_tags WHERE todo_item_id = ?", itemID); err != nil {
+func setTodoItemTags(q querier, itemID int64, tagIDs []int64) error {
+	if _, err := q.Exec("DELETE FROM todo_item_tags WHERE todo_item_id = ?", itemID); err != nil {
 		return fmt.Errorf("clear todo item tags: %w", err)
 	}
 
@@ -250,12 +286,11 @@ func (db *DB) SetTodoItemTags(itemID int64, tagIDs []int64) error {
 			args = append(args, itemID, tid)
 		}
 		query := "INSERT INTO todo_item_tags (todo_item_id, tag_id) VALUES " + strings.Join(placeholders, ", ")
-		if _, err := tx.Exec(query, args...); err != nil {
+		if _, err := q.Exec(query, args...); err != nil {
 			return fmt.Errorf("insert todo item tags: %w", err)
 		}
 	}
-
-	return tx.Commit()
+	return nil
 }
 
 func (db *DB) ReorderTodoItems(listID int64, itemIDs []int64) error {

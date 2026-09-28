@@ -344,10 +344,23 @@ func (h *Handler) apiCreateShoppingItem(w http.ResponseWriter, r *http.Request) 
 	if item.Quantity < 1 {
 		item.Quantity = 1
 	}
+	item.Unit = strings.TrimSpace(item.Unit)
 
-	if existing, err := h.db.FindShoppingItemByName(listID, item.Name); err == nil {
-		h.db.ReactivateShoppingItem(existing.ID, item.Quantity, item.Unit)
-		reactivated, _ := h.db.GetShoppingItem(existing.ID)
+	existing, err := h.db.FindShoppingItemByName(listID, item.Name)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if existing != nil {
+		if err := h.db.ReactivateShoppingItem(existing.ID, item.Quantity, item.Unit); err != nil {
+			jsonError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		reactivated, err := h.db.GetShoppingItem(existing.ID)
+		if err != nil {
+			jsonError(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		jsonResponse(w, reactivated, http.StatusOK)
 		return
 	}

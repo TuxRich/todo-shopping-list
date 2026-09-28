@@ -1,3 +1,11 @@
+## 1.1.2
+
+- Fixed saving an item together with its tags only half-succeeding when one part failed; the item and its tags are now saved together or not at all, both when adding and when editing
+- Ticking or unticking an item now counts as activity, moving its list to the top of the recent lists
+- Fixed re-adding an existing shopping item through the REST API ignoring errors and returning an empty response
+- Fixed a database error during duplicate detection causing a second copy of a shopping item to be created
+- Invalid tag values in a form submission are now ignored instead of failing the whole save
+
 ## 1.1.1
 
 - Fixed a cross-site scripting hole: a category or tag name containing HTML ran as code when its edit dialog was opened

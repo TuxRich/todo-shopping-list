@@ -32,6 +32,29 @@ func (db *DB) Close() error {
 	return db.conn.Close()
 }
 
+// querier is satisfied by both *sql.DB and *sql.Tx, so the same statement
+// helpers can run standalone or inside a transaction.
+type querier interface {
+	Exec(query string, args ...interface{}) (sql.Result, error)
+	QueryRow(query string, args ...interface{}) *sql.Row
+}
+
+// inTx runs fn in a transaction, committing only if it returns nil. The pool
+// holds a single connection, so fn must use tx and never db.conn, or it will
+// block forever waiting for the connection the transaction already holds.
+func (db *DB) inTx(fn func(tx *sql.Tx) error) error {
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	if err := fn(tx); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func (db *DB) migrate() error {
 	migrations := []string{
 		`CREATE TABLE IF NOT EXISTS categories (

@@ -122,7 +122,11 @@ func (h *Handler) handleCreateShoppingItem(w http.ResponseWriter, r *http.Reques
 	}
 	unit := strings.TrimSpace(r.FormValue("unit"))
 
-	if existing, err := h.db.FindShoppingItemByName(listID, name); err == nil {
+	existing, err := h.db.FindShoppingItemByName(listID, name)
+	if dbError(w, err) {
+		return
+	}
+	if existing != nil {
 		if dbError(w, h.db.ReactivateShoppingItem(existing.ID, qty, unit)) {
 			return
 		}
@@ -142,19 +146,8 @@ func (h *Handler) handleCreateShoppingItem(w http.ResponseWriter, r *http.Reques
 			item.CategoryID = &cid
 		}
 	}
-	if dbError(w, h.db.CreateShoppingItem(item)) {
+	if dbError(w, h.db.CreateShoppingItemWithTags(item, formTagIDs(r))) {
 		return
-	}
-
-	if tagIDs := r.Form["tag_ids"]; len(tagIDs) > 0 {
-		var ids []int64
-		for _, t := range tagIDs {
-			tid, _ := strconv.ParseInt(t, 10, 64)
-			ids = append(ids, tid)
-		}
-		if dbError(w, h.db.SetShoppingItemTags(item.ID, ids)) {
-			return
-		}
 	}
 
 	h.renderShoppingItems(w, r, listID)
@@ -218,16 +211,7 @@ func (h *Handler) handleUpdateShoppingItem(w http.ResponseWriter, r *http.Reques
 	} else {
 		item.CategoryID = nil
 	}
-	if dbError(w, h.db.UpdateShoppingItem(item)) {
-		return
-	}
-
-	var tagIDs []int64
-	for _, t := range r.Form["tag_ids"] {
-		tid, _ := strconv.ParseInt(t, 10, 64)
-		tagIDs = append(tagIDs, tid)
-	}
-	if dbError(w, h.db.SetShoppingItemTags(item.ID, tagIDs)) {
+	if dbError(w, h.db.UpdateShoppingItemWithTags(item, formTagIDs(r))) {
 		return
 	}
 
@@ -268,12 +252,7 @@ func (h *Handler) handleSetShoppingItemTags(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	r.ParseForm()
-	var tagIDs []int64
-	for _, t := range r.Form["tag_ids"] {
-		tid, _ := strconv.ParseInt(t, 10, 64)
-		tagIDs = append(tagIDs, tid)
-	}
-	if dbError(w, h.db.SetShoppingItemTags(itemID, tagIDs)) {
+	if dbError(w, h.db.SetShoppingItemTags(itemID, formTagIDs(r))) {
 		return
 	}
 	h.renderShoppingItems(w, r, item.ListID)

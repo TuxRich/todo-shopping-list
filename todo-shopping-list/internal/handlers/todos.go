@@ -160,19 +160,8 @@ func (h *Handler) handleCreateTodoItem(w http.ResponseWriter, r *http.Request) {
 	if de := r.FormValue("date_end"); de != "" {
 		item.DateEnd = &de
 	}
-	if dbError(w, h.db.CreateTodoItem(item)) {
+	if dbError(w, h.db.CreateTodoItemWithTags(item, formTagIDs(r))) {
 		return
-	}
-
-	if tagIDs := r.Form["tag_ids"]; len(tagIDs) > 0 {
-		var ids []int64
-		for _, t := range tagIDs {
-			tid, _ := strconv.ParseInt(t, 10, 64)
-			ids = append(ids, tid)
-		}
-		if dbError(w, h.db.SetTodoItemTags(item.ID, ids)) {
-			return
-		}
 	}
 
 	h.renderTodoItems(w, listID)
@@ -209,16 +198,7 @@ func (h *Handler) handleUpdateTodoItem(w http.ResponseWriter, r *http.Request) {
 	} else {
 		item.DateEnd = nil
 	}
-	if dbError(w, h.db.UpdateTodoItem(item)) {
-		return
-	}
-
-	var tagIDs []int64
-	for _, t := range r.Form["tag_ids"] {
-		tid, _ := strconv.ParseInt(t, 10, 64)
-		tagIDs = append(tagIDs, tid)
-	}
-	if dbError(w, h.db.SetTodoItemTags(item.ID, tagIDs)) {
+	if dbError(w, h.db.UpdateTodoItemWithTags(item, formTagIDs(r))) {
 		return
 	}
 
@@ -259,12 +239,7 @@ func (h *Handler) handleSetTodoItemTags(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	r.ParseForm()
-	var tagIDs []int64
-	for _, t := range r.Form["tag_ids"] {
-		tid, _ := strconv.ParseInt(t, 10, 64)
-		tagIDs = append(tagIDs, tid)
-	}
-	if dbError(w, h.db.SetTodoItemTags(itemID, tagIDs)) {
+	if dbError(w, h.db.SetTodoItemTags(itemID, formTagIDs(r))) {
 		return
 	}
 	h.renderTodoItems(w, item.ListID)

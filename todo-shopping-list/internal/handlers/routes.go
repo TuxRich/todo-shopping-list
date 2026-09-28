@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"todo-app/internal/database"
@@ -225,6 +226,19 @@ func requiredField(w http.ResponseWriter, r *http.Request, field, label string) 
 		return "", false
 	}
 	return value, true
+}
+
+// formTagIDs parses the tag_ids form values, skipping anything that is not a
+// positive integer so a malformed value cannot fail the whole write. Callers
+// must have parsed the form first.
+func formTagIDs(r *http.Request) []int64 {
+	var ids []int64
+	for _, v := range r.Form["tag_ids"] {
+		if id, err := strconv.ParseInt(v, 10, 64); err == nil && id > 0 {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 // dbError reports whether err is non-nil, writing a 500 and logging the cause.
