@@ -45,13 +45,6 @@
     </div>
     {{end}}
 </div>
-{{if eq .Sort "manual"}}
-<script>
-if (typeof Sortable !== 'undefined') {
-    initShoppingSortable();
-}
-</script>
-{{end}}
 {{else}}
 <div class="text-center py-12 bg-ctp-surface0 rounded-xl border border-ctp-surface1">
     <p class="text-ctp-overlay1">No items yet. Add one above!</p>

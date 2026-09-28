@@ -1,6 +1,6 @@
 function initTodoSortable() {
     var el = document.getElementById('todo-sortable');
-    if (!el) return;
+    if (!el || Sortable.get(el)) return;
     new Sortable(el, {
         handle: '.drag-handle',
         animation: 150,
@@ -20,9 +20,49 @@ function initTodoSortable() {
     });
 }
 
+// Drag and drop between the board's columns. Dropping saves the new order of
+// every card on the board, then, if the card changed column, saves its status
+// and re-renders the board from the server so everything reflects the result.
+function initTodoBoard() {
+    var board = document.getElementById('todo-board');
+    if (!board) return;
+    var listId = board.dataset.listId;
+    board.querySelectorAll('.board-column').forEach(function (column) {
+        if (Sortable.get(column)) return;
+        new Sortable(column, {
+            group: 'todo-board',
+            draggable: '.board-card',
+            filter: 'button',
+            preventOnFilter: false,
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            onEnd: function (evt) {
+                var ids = Array.from(board.querySelectorAll('.board-card')).map(function (card) {
+                    return Number(card.dataset.id);
+                });
+                var reorder = fetch('todos/' + encodeURIComponent(listId) + '/reorder', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({item_ids: ids})
+                });
+                if (evt.from === evt.to) return;
+                var status = evt.to.dataset.status;
+                reorder.catch(function () {}).then(function () {
+                    htmx.ajax('POST', 'todos/items/' + encodeURIComponent(evt.item.dataset.id) + '/status', {
+                        target: '#items-list',
+                        swap: 'innerHTML',
+                        values: {status: status}
+                    });
+                });
+            }
+        });
+    });
+}
+
 function initShoppingSortable() {
     var el = document.getElementById('shopping-sortable');
-    if (!el) return;
+    if (!el || Sortable.get(el)) return;
     new Sortable(el, {
         handle: '.drag-handle',
         animation: 150,
@@ -178,3 +218,19 @@ function showEditModal(html, values) {
         }, 300);
     });
 })();
+
+// Bind drag and drop whenever content appears: htmx.onLoad runs on the first
+// page load and again after every swap. Inline scripts in the partials could
+// not do this, because on a full page load they ran before this file defined
+// the init functions. Each init skips elements that are already bound, so the
+// repeat runs are harmless, and the flag stops hx-boost navigations (which
+// re-run this file) from registering the hook again.
+if (!window.sortableHookInstalled) {
+    window.sortableHookInstalled = true;
+    htmx.onLoad(function () {
+        if (typeof Sortable === 'undefined') return;
+        initTodoSortable();
+        initShoppingSortable();
+        initTodoBoard();
+    });
+}

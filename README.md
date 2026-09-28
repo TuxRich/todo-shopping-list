@@ -17,6 +17,8 @@ A web-based todo and shopping list manager built in Go with SQLite, designed as 
 **Todo Lists**
 - Create multiple lists with categories
 - Items with optional deadlines and date ranges
+- Mark tasks as To do, In progress, or Done
+- Board view: To do, In progress, and Done columns side by side, with drag and drop between them
 - Tag items for easy filtering
 - Drag-and-drop reordering
 
@@ -64,3 +66,5 @@ All endpoints return JSON. Base path: `/api/v1/`
 | GET/PUT/DELETE | `/api/v1/categories/:id` | Get / update / delete a category |
 | GET/POST | `/api/v1/tags` | List / create tags |
 | GET/PUT/DELETE | `/api/v1/tags/:id` | Get / update / delete a tag |
+
+Todo items have a `status` of `todo`, `in_progress`, or `done`. The older `completed` flag is still accepted and kept in sync: `true` means done.

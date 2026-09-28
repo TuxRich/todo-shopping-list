@@ -97,7 +97,7 @@ func (db *DB) DeleteTodoList(id int64) error {
 
 func (db *DB) GetTodoItems(listID int64) ([]TodoItem, error) {
 	rows, err := db.conn.Query(`
-		SELECT id, list_id, title, description, completed, deadline, date_start, date_end,
+		SELECT id, list_id, title, description, status, completed, deadline, date_start, date_end,
 			sort_order, created_at, updated_at
 		FROM todo_items WHERE list_id = ?
 		ORDER BY completed ASC, sort_order ASC, created_at DESC`, listID)
@@ -110,7 +110,7 @@ func (db *DB) GetTodoItems(listID int64) ([]TodoItem, error) {
 	for rows.Next() {
 		var item TodoItem
 		if err := rows.Scan(&item.ID, &item.ListID, &item.Title, &item.Description,
-			&item.Completed, &item.Deadline, &item.DateStart, &item.DateEnd,
+			&item.Status, &item.Completed, &item.Deadline, &item.DateStart, &item.DateEnd,
 			&item.SortOrder, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan todo item: %w", err)
 		}
@@ -157,11 +157,11 @@ func (db *DB) getTodoItemTags(itemID int64) ([]Tag, error) {
 func (db *DB) GetTodoItem(id int64) (*TodoItem, error) {
 	var item TodoItem
 	err := db.conn.QueryRow(`
-		SELECT id, list_id, title, description, completed, deadline, date_start, date_end,
+		SELECT id, list_id, title, description, status, completed, deadline, date_start, date_end,
 			sort_order, created_at, updated_at
 		FROM todo_items WHERE id = ?`, id).
 		Scan(&item.ID, &item.ListID, &item.Title, &item.Description,
-			&item.Completed, &item.Deadline, &item.DateStart, &item.DateEnd,
+			&item.Status, &item.Completed, &item.Deadline, &item.DateStart, &item.DateEnd,
 			&item.SortOrder, &item.CreatedAt, &item.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get todo item %d: %w", id, err)
@@ -190,14 +190,19 @@ func (db *DB) CreateTodoItemWithTags(item *TodoItem, tagIDs []int64) error {
 }
 
 func createTodoItem(q querier, item *TodoItem) error {
+	if item.Status == "" {
+		item.SetCompleted(item.Completed)
+	}
+	item.Completed = item.Status == TodoDone
+
 	now := time.Now()
 	var maxOrder int
 	q.QueryRow("SELECT COALESCE(MAX(sort_order), 0) FROM todo_items WHERE list_id = ?", item.ListID).Scan(&maxOrder)
 
 	res, err := q.Exec(`
-		INSERT INTO todo_items (list_id, title, description, completed, deadline, date_start, date_end, sort_order, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		item.ListID, item.Title, item.Description, item.Completed,
+		INSERT INTO todo_items (list_id, title, description, status, completed, deadline, date_start, date_end, sort_order, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		item.ListID, item.Title, item.Description, item.Status, item.Completed,
 		item.Deadline, item.DateStart, item.DateEnd, maxOrder+1, now, now)
 	if err != nil {
 		return fmt.Errorf("insert todo item: %w", err)
@@ -227,12 +232,14 @@ func (db *DB) UpdateTodoItemWithTags(item *TodoItem, tagIDs []int64) error {
 }
 
 func updateTodoItem(q querier, item *TodoItem) error {
+	item.Completed = item.Status == TodoDone
+
 	now := time.Now()
 	_, err := q.Exec(`
-		UPDATE todo_items SET title = ?, description = ?, completed = ?, deadline = ?,
+		UPDATE todo_items SET title = ?, description = ?, status = ?, completed = ?, deadline = ?,
 			date_start = ?, date_end = ?, sort_order = ?, updated_at = ?
 		WHERE id = ?`,
-		item.Title, item.Description, item.Completed,
+		item.Title, item.Description, item.Status, item.Completed,
 		item.Deadline, item.DateStart, item.DateEnd,
 		item.SortOrder, now, item.ID)
 	if err != nil {
@@ -244,14 +251,39 @@ func updateTodoItem(q querier, item *TodoItem) error {
 	return nil
 }
 
-// ToggleTodoItem flips the completed flag and counts as activity on the list.
-// It stamps time.Now() like every other write, rather than SQLite's
+// ToggleTodoItem ticks an item done, or reopens a done item as todo. An
+// in-progress item is ticked straight to done. It counts as activity on the
+// list, and stamps time.Now() like every other write, rather than SQLite's
 // CURRENT_TIMESTAMP, so updated_at is stored in one consistent format.
 func (db *DB) ToggleTodoItem(id int64) error {
 	now := time.Now()
+	// Every expression on the right-hand side sees the row's old values, so
+	// both CASEs test the status as it was before this update.
 	if _, err := db.conn.Exec(`
-		UPDATE todo_items SET completed = NOT completed, updated_at = ? WHERE id = ?`, now, id); err != nil {
+		UPDATE todo_items SET
+			status = CASE WHEN status = 'done' THEN 'todo' ELSE 'done' END,
+			completed = CASE WHEN status = 'done' THEN 0 ELSE 1 END,
+			updated_at = ?
+		WHERE id = ?`, now, id); err != nil {
 		return fmt.Errorf("toggle todo item: %w", err)
+	}
+
+	db.conn.Exec(`UPDATE todo_lists SET updated_at = ?
+		WHERE id = (SELECT list_id FROM todo_items WHERE id = ?)`, now, id)
+	return nil
+}
+
+// SetTodoItemStatus moves an item to status, keeping completed in step, and
+// counts as activity on the list.
+func (db *DB) SetTodoItemStatus(id int64, status string) error {
+	if !ValidTodoStatus(status) {
+		return fmt.Errorf("invalid todo status %q", status)
+	}
+	now := time.Now()
+	if _, err := db.conn.Exec(`
+		UPDATE todo_items SET status = ?, completed = ?, updated_at = ? WHERE id = ?`,
+		status, status == TodoDone, now, id); err != nil {
+		return fmt.Errorf("set todo item status: %w", err)
 	}
 
 	db.conn.Exec(`UPDATE todo_lists SET updated_at = ?

@@ -134,5 +134,30 @@ func (db *DB) migrate() error {
 		}
 	}
 
-	return nil
+	return db.addTodoStatus()
+}
+
+// addTodoStatus adds the todo_items.status column to databases created before
+// statuses existed, backfilling it from completed. It is a no-op once the
+// column is present, so it is safe to run on every start.
+func (db *DB) addTodoStatus() error {
+	var exists int
+	if err := db.conn.QueryRow(
+		"SELECT COUNT(*) FROM pragma_table_info('todo_items') WHERE name = 'status'").Scan(&exists); err != nil {
+		return fmt.Errorf("inspect todo_items: %w", err)
+	}
+	if exists > 0 {
+		return nil
+	}
+
+	return db.inTx(func(tx *sql.Tx) error {
+		if _, err := tx.Exec(`ALTER TABLE todo_items ADD COLUMN status TEXT NOT NULL DEFAULT 'todo'
+			CHECK (status IN ('todo', 'in_progress', 'done'))`); err != nil {
+			return fmt.Errorf("add todo status column: %w", err)
+		}
+		if _, err := tx.Exec("UPDATE todo_items SET status = 'done' WHERE completed = 1"); err != nil {
+			return fmt.Errorf("backfill todo status: %w", err)
+		}
+		return nil
+	})
 }

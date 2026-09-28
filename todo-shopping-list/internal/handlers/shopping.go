@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 
@@ -287,14 +286,7 @@ func (h *Handler) handleSearchShoppingHistory(w http.ResponseWriter, r *http.Req
 }
 
 func (h *Handler) renderShoppingItems(w http.ResponseWriter, r *http.Request, listID int64) {
-	sort := r.URL.Query().Get("sort")
-	if sort == "" {
-		if ref := r.Header.Get("Hx-Current-Url"); ref != "" {
-			if u, err := url.Parse(ref); err == nil {
-				sort = u.Query().Get("sort")
-			}
-		}
-	}
+	sort := pageParam(r, "sort")
 	items, err := h.db.GetShoppingItems(listID, sort)
 	if dbError(w, err) {
 		return

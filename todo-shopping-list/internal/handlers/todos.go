@@ -105,11 +105,57 @@ func (h *Handler) handleTodoDetail(w http.ResponseWriter, r *http.Request) {
 		"ActiveNav":  "todos",
 		"Title":      list.Name,
 		"List":       list,
-		"Items":      items,
 		"Categories": categories,
-		"Tags":       tags,
+	}
+	for k, v := range todoItemsData(id, items, tags, r.URL.Query().Get("view")) {
+		data[k] = v
 	}
 	h.render(w, r, "templates/todo_detail.html", data)
+}
+
+// boardColumn is one column of the todo board. Prev and Next are the statuses
+// either side, with the labels for the buttons that move a card there, so a
+// card can be moved without drag and drop. They are empty at the board's edges.
+type boardColumn struct {
+	Status    string
+	Label     string
+	Prev      string
+	PrevLabel string
+	Next      string
+	NextLabel string
+	Items     []database.TodoItem
+}
+
+func boardColumns(items []database.TodoItem) []boardColumn {
+	cols := []boardColumn{
+		{Status: database.TodoTodo, Label: "To do",
+			Next: database.TodoInProgress, NextLabel: "Start"},
+		{Status: database.TodoInProgress, Label: "In progress",
+			Prev: database.TodoTodo, PrevLabel: "To do",
+			Next: database.TodoDone, NextLabel: "Done"},
+		{Status: database.TodoDone, Label: "Done",
+			Prev: database.TodoInProgress, PrevLabel: "Reopen"},
+	}
+	for _, item := range items {
+		for i := range cols {
+			if cols[i].Status == item.Status {
+				cols[i].Items = append(cols[i].Items, item)
+			}
+		}
+	}
+	return cols
+}
+
+// todoItemsData is what both the list and board partials render from, shared
+// by the full page and by every htmx swap of the items area.
+func todoItemsData(listID int64, items []database.TodoItem, tags []database.Tag, view string) map[string]interface{} {
+	return map[string]interface{}{
+		"ListID":  listID,
+		"View":    view,
+		"Items":   items,
+		"Tags":    tags,
+		"Columns": boardColumns(items),
+	}
 }
 
 func (h *Handler) handleUpdateTodoList(w http.ResponseWriter, r *http.Request) {
@@ -164,7 +210,7 @@ func (h *Handler) handleCreateTodoItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.renderTodoItems(w, listID)
+	h.renderTodoItems(w, r, listID)
 }
 
 func (h *Handler) handleUpdateTodoItem(w http.ResponseWriter, r *http.Request) {
@@ -198,11 +244,18 @@ func (h *Handler) handleUpdateTodoItem(w http.ResponseWriter, r *http.Request) {
 	} else {
 		item.DateEnd = nil
 	}
+	if status := r.FormValue("status"); status != "" {
+		if !database.ValidTodoStatus(status) {
+			http.Error(w, "Invalid status", http.StatusBadRequest)
+			return
+		}
+		item.Status = status
+	}
 	if dbError(w, h.db.UpdateTodoItemWithTags(item, formTagIDs(r))) {
 		return
 	}
 
-	h.renderTodoItems(w, item.ListID)
+	h.renderTodoItems(w, r, item.ListID)
 }
 
 func (h *Handler) handleDeleteTodoItem(w http.ResponseWriter, r *http.Request) {
@@ -215,7 +268,7 @@ func (h *Handler) handleDeleteTodoItem(w http.ResponseWriter, r *http.Request) {
 	if dbError(w, h.db.DeleteTodoItem(itemID)) {
 		return
 	}
-	h.renderTodoItems(w, item.ListID)
+	h.renderTodoItems(w, r, item.ListID)
 }
 
 func (h *Handler) handleToggleTodoItem(w http.ResponseWriter, r *http.Request) {
@@ -228,7 +281,25 @@ func (h *Handler) handleToggleTodoItem(w http.ResponseWriter, r *http.Request) {
 	if dbError(w, h.db.ToggleTodoItem(itemID)) {
 		return
 	}
-	h.renderTodoItems(w, item.ListID)
+	h.renderTodoItems(w, r, item.ListID)
+}
+
+func (h *Handler) handleSetTodoItemStatus(w http.ResponseWriter, r *http.Request) {
+	itemID, _ := strconv.ParseInt(chi.URLParam(r, "itemID"), 10, 64)
+	item, err := h.db.GetTodoItem(itemID)
+	if err != nil {
+		http.Error(w, "Item not found", http.StatusNotFound)
+		return
+	}
+	status := r.FormValue("status")
+	if !database.ValidTodoStatus(status) {
+		http.Error(w, "Invalid status", http.StatusBadRequest)
+		return
+	}
+	if dbError(w, h.db.SetTodoItemStatus(itemID, status)) {
+		return
+	}
+	h.renderTodoItems(w, r, item.ListID)
 }
 
 func (h *Handler) handleSetTodoItemTags(w http.ResponseWriter, r *http.Request) {
@@ -242,7 +313,7 @@ func (h *Handler) handleSetTodoItemTags(w http.ResponseWriter, r *http.Request) 
 	if dbError(w, h.db.SetTodoItemTags(itemID, formTagIDs(r))) {
 		return
 	}
-	h.renderTodoItems(w, item.ListID)
+	h.renderTodoItems(w, r, item.ListID)
 }
 
 func (h *Handler) handleReorderTodoItems(w http.ResponseWriter, r *http.Request) {
@@ -260,7 +331,9 @@ func (h *Handler) handleReorderTodoItems(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *Handler) renderTodoItems(w http.ResponseWriter, listID int64) {
+// renderTodoItems re-renders the items area in whichever view (list or board)
+// the page making the request is showing.
+func (h *Handler) renderTodoItems(w http.ResponseWriter, r *http.Request, listID int64) {
 	items, err := h.db.GetTodoItems(listID)
 	if dbError(w, err) {
 		return
@@ -269,10 +342,12 @@ func (h *Handler) renderTodoItems(w http.ResponseWriter, listID int64) {
 	if dbError(w, err) {
 		return
 	}
-	h.renderPartial(w, "todo-items-list", map[string]interface{}{
-		"Items": items,
-		"Tags":  tags,
-	})
+	view := pageParam(r, "view")
+	partial := "todo-items-list"
+	if view == "board" {
+		partial = "todo-board"
+	}
+	h.renderPartial(w, partial, todoItemsData(listID, items, tags, view))
 }
 
 func (h *Handler) handleGetTodoItemEdit(w http.ResponseWriter, r *http.Request) {

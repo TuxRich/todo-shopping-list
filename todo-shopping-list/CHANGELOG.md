@@ -1,3 +1,11 @@
+## 1.2.0
+
+- Tasks can now be marked To do, In progress, or Done; the list view shows an "In progress" badge and has a start/pause button on each task
+- Added a board view for todo lists: To do, In progress, and Done columns side by side, with drag and drop between them and move buttons on each card
+- Existing tasks are upgraded automatically on first start: completed tasks become Done and the rest To do
+- REST API: todo items have a new `status` field (`todo`, `in_progress`, `done`); the `completed` flag is still accepted and kept in sync
+- Fixed drag-and-drop reordering not working after a page refresh or when opening a list directly, for both todo lists and shopping lists in manual sort
+
 ## 1.1.2
 
 - Fixed saving an item together with its tags only half-succeeding when one part failed; the item and its tags are now saved together or not at all, both when adding and when editing

@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -115,6 +116,7 @@ func NewRouter(db *database.DB) http.Handler {
 		r.Put("/items/{itemID}", h.handleUpdateTodoItem)
 		r.Delete("/items/{itemID}", h.handleDeleteTodoItem)
 		r.Post("/items/{itemID}/toggle", h.handleToggleTodoItem)
+		r.Post("/items/{itemID}/status", h.handleSetTodoItemStatus)
 		r.Put("/items/{itemID}/tags", h.handleSetTodoItemTags)
 		r.Post("/{id}/reorder", h.handleReorderTodoItems)
 	})
@@ -226,6 +228,19 @@ func requiredField(w http.ResponseWriter, r *http.Request, field, label string) 
 		return "", false
 	}
 	return value, true
+}
+
+// pageParam returns a query parameter of the page the user is looking at. htmx
+// requests go to their own URL, so this falls back to the HX-Current-URL
+// header htmx sends with each request to recover the page's query string.
+func pageParam(r *http.Request, key string) string {
+	if v := r.URL.Query().Get(key); v != "" {
+		return v
+	}
+	if u, err := url.Parse(r.Header.Get("Hx-Current-Url")); err == nil {
+		return u.Query().Get(key)
+	}
+	return ""
 }
 
 // formTagIDs parses the tag_ids form values, skipping anything that is not a

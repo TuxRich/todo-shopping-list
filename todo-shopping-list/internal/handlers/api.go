@@ -37,6 +37,12 @@ func decodePatch(r *http.Request) (*jsonPatch, error) {
 	return &jsonPatch{fields: fields}, nil
 }
 
+// has reports whether the request body included key.
+func (p *jsonPatch) has(key string) bool {
+	_, ok := p.fields[key]
+	return ok
+}
+
 // apply writes the field into dst if it was present in the request body.
 // A JSON null clears a pointer destination, so nullable columns stay settable.
 func (p *jsonPatch) apply(key string, dst interface{}) {
@@ -48,6 +54,8 @@ func (p *jsonPatch) apply(key string, dst interface{}) {
 		p.err = fmt.Errorf("invalid value for %q", key)
 	}
 }
+
+const invalidStatusMsg = `status must be one of "todo", "in_progress", "done"`
 
 // --- Todo Lists ---
 
@@ -161,6 +169,10 @@ func (h *Handler) apiCreateTodoItem(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "Title is required", http.StatusBadRequest)
 		return
 	}
+	if item.Status != "" && !database.ValidTodoStatus(item.Status) {
+		jsonError(w, invalidStatusMsg, http.StatusBadRequest)
+		return
+	}
 	if err := h.db.CreateTodoItem(&item); err != nil {
 		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -192,6 +204,7 @@ func (h *Handler) apiUpdateTodoItem(w http.ResponseWriter, r *http.Request) {
 	}
 	patch.apply("title", &item.Title)
 	patch.apply("description", &item.Description)
+	patch.apply("status", &item.Status)
 	patch.apply("completed", &item.Completed)
 	patch.apply("deadline", &item.Deadline)
 	patch.apply("date_start", &item.DateStart)
@@ -200,6 +213,16 @@ func (h *Handler) apiUpdateTodoItem(w http.ResponseWriter, r *http.Request) {
 	if patch.err != nil {
 		jsonError(w, patch.err.Error(), http.StatusBadRequest)
 		return
+	}
+	// status wins when both are sent; a bare completed flag is mapped onto it
+	// so older clients that only know completed keep working.
+	if patch.has("status") {
+		if !database.ValidTodoStatus(item.Status) {
+			jsonError(w, invalidStatusMsg, http.StatusBadRequest)
+			return
+		}
+	} else if patch.has("completed") {
+		item.SetCompleted(item.Completed)
 	}
 	item.Title = strings.TrimSpace(item.Title)
 	if item.Title == "" {
